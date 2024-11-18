@@ -1,3 +1,4 @@
+https://raw.githubusercontent.com/arunwebber/simpleExcel/refs/heads/main/images/icon_128.png
 # Simple Browser-Based Excel Sheet Extension
 
 This is a simple Chrome extension that mimics basic functionality of an Excel sheet. It allows users to interact with a table and input data, providing a lightweight, browser-based spreadsheet experience.
