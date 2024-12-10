@@ -90,3 +90,12 @@ To make the extension compatible with Firefox, replace the contents of your `man
   "homepage_url": "https://www.arunsyoga.in",
   "author": "HashPalLabs"
 }
+```
+### 4. Load the Extension in Firefox
+
+To install the extension in Firefox, follow these steps:
+
+1. Open **Firefox** and go to `about:debugging#/runtime/this-firefox`.
+2. Click the **Load Temporary Add-on** button.
+3. In the file dialog, navigate to the directory where you've saved the extension files.
+4. Select the `manifest.json` file to load the extension.
