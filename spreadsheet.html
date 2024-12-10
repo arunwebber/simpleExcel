@@ -7,10 +7,26 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <button id="addRowBtn">Add Row</button>
-  <button id="addColBtn">Add Column</button>
+    <!-- Header Section -->
+    <div id="header">
+        <div id="title">Simple Browser Based Excel sheet</div>
+    </div>
 
-  <table id="spreadsheet"></table>
+    <!-- Table container -->
+    <div class="container">
+        <table id="spreadsheet"></table>
+    </div>
+
+    <!-- Footer Section -->
+    <div id="footer">
+        For support and code base:<a target="_blank" href="https://arunsyoga.in/extentions.html">HahsPalLabs</a>.
+    </div>
+
+    <!-- Right-click menu for row/column delete -->
+    <div id="contextMenu" style="display: none; position: absolute; background: #fff; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+        <button id="deleteRowBtn">Delete Row</button>
+        <button id="deleteColBtn">Delete Column</button>
+    </div>
 
   <script src="spreadsheet.js"></script>
 </body>

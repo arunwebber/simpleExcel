@@ -255,3 +255,4 @@ document.getElementById("addColBtn").addEventListener("click", function () {
     });
   });
 });
+
