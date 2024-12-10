@@ -60,3 +60,33 @@ Once the extension is installed:
 ## License
 
 This project is open-source and available under the MIT License. See the [LICENSE](LICENSE) file for more information.
+
+## Customization for Firefox
+
+To make the extension compatible with Firefox, replace the contents of your `manifest.json` file with the following:
+
+```json
+{
+  "manifest_version": 3,
+  "name": "Simple Spreadsheet Extension",
+  "version": "1.1",
+  "description": "Opens a new tab with a simple spreadsheet interface.",
+  "action": {
+    "default_title": "Open Spreadsheet",
+    "default_icon": {
+      "16": "images/icon_16.png",
+      "48": "images/icon_48.png",
+      "128": "images/icon_128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "images/icon_16.png",
+    "48": "images/icon_48.png",
+    "128": "images/icon_128.png"
+  },
+  "homepage_url": "https://www.arunsyoga.in",
+  "author": "HashPalLabs"
+}
