@@ -3,17 +3,32 @@ let numRows = 25; // Set initial number of rows
 let numCols = 25; // Set initial number of columns
 
 const table = document.getElementById("spreadsheet");
+const contextMenu = document.getElementById('contextMenu');
+let selectedRow = null;
+let selectedCol = null;
 
-// Function to create the table
+// Function to get the Excel-style column name (A, B, C, ..., Z, AA, AB, ..., AZ, BA, ...)
+function getColumnName(colIndex) {
+  let columnName = '';
+  while (colIndex > 0) {
+    const remainder = (colIndex - 1) % 26;  // Get remainder (0 = A, 1 = B, ..., 25 = Z)
+    let letter = String.fromCharCode(65 + remainder);  // Directly get the character
+    columnName = letter + columnName;  // Prepend the character to the column name
+    colIndex = Math.floor((colIndex - 1) / 26);  // Update colIndex for the next significant letter
+  }
+  return columnName;
+}
+
+// Modify the table creation to use Excel-style column naming
 function createTable() {
   table.innerHTML = ""; // Clear any existing table content
 
-  // Create column headers (A, B, C, D, ...)
+  // Create column headers (A, B, C, D, ..., Z, AA, AB, ...)
   const headerRow = document.createElement("tr");
   headerRow.appendChild(document.createElement("th")); // Top-left corner empty cell
-  for (let col = 0; col < numCols; col++) {
+  for (let col = 1; col <= numCols; col++) {
     const th = document.createElement("th");
-    th.textContent = String.fromCharCode(65 + col); // ASCII for A, B, C, ...
+    th.textContent = getColumnName(col); // Use Excel-style column names
     headerRow.appendChild(th);
   }
   table.appendChild(headerRow);
@@ -117,6 +132,57 @@ function highlightRowAndColumn(row, col) {
 // Initial table creation
 createTable();
 
+// Show context menu
+function showContextMenu(event) {
+  const cell = event.target;
+
+  // Determine whether the clicked element is a row header or column header
+  if (cell.tagName === 'TH') {
+    // Check if the clicked element is a row header (first column)
+    if (cell.parentElement === table.querySelector("tr:first-child")) {
+      // Right-clicked on the column header, show Add Column
+      document.getElementById("addRowBtn").style.display = 'none'; // Hide Add Row
+      document.getElementById("addColBtn").style.display = 'block'; // Show Add Column
+    } else {
+      // Right-clicked on the row header, show Add Row
+      document.getElementById("addRowBtn").style.display = 'block'; // Show Add Row
+      document.getElementById("addColBtn").style.display = 'none'; // Hide Add Column
+    }
+
+    // Show context menu
+    contextMenu.style.display = 'block';
+    contextMenu.style.left = `${event.pageX}px`;
+    contextMenu.style.top = `${event.pageY}px`;
+
+    // Get the row and column index
+    if (cell.parentElement === table.querySelector("tr:first-child")) {
+      // Column header clicked
+      const colIndex = Array.from(cell.parentElement.children).indexOf(cell);
+      selectedRow = null; // Reset selected row
+      selectedCol = colIndex;
+    } else {
+      // Row header clicked
+      const rowIndex = Array.from(cell.parentElement.children).indexOf(cell);
+      selectedRow = rowIndex;
+      selectedCol = null; // Reset selected column
+    }
+  } else {
+    // If the right-click is on a table cell, reset the context menu
+    contextMenu.style.display = 'none';
+  }
+}
+
+// Event listener to show context menu on right click
+table.addEventListener('contextmenu', function (event) {
+  event.preventDefault();
+  showContextMenu(event);
+});
+
+// Hide context menu on click anywhere
+document.addEventListener('click', function () {
+  contextMenu.style.display = 'none';
+});
+
 // Function to add a new row
 document.getElementById("addRowBtn").addEventListener("click", function () {
   numRows++;  // Increase the number of rows
@@ -183,7 +249,9 @@ document.getElementById("addRowBtn").addEventListener("click", function () {
       document.addEventListener("mouseup", onMouseUp);
     });
   }
+
   table.appendChild(tr);
+  document.getElementById("contextMenu").style.display = 'none';
 });
 
 // Function to add a new column
@@ -191,15 +259,14 @@ document.getElementById("addColBtn").addEventListener("click", function () {
   numCols++;  // Increase the number of columns
 
   // Update the column headers
-  const headerRow = table.querySelector("tr");
+  const headerRow = table.querySelector("tr:first-child");
   const th = document.createElement("th");
-  th.textContent = String.fromCharCode(65 + numCols - 1); // Update column letter
+  th.textContent = getColumnName(numCols); // Add new column header dynamically
   headerRow.appendChild(th);
 
-  // Add new cells for each row
-  const rows = table.querySelectorAll("tr");
-  rows.forEach((row, rowIndex) => {
-    if (rowIndex === 0) return;  // Skip the header row
+  // Add a new cell in each existing row
+  for (let row = 1; row <= numRows; row++) {
+    const tr = table.querySelectorAll("tr")[row];
     const td = document.createElement("td");
     const input = document.createElement("input");
     input.type = "text";
@@ -213,7 +280,7 @@ document.getElementById("addColBtn").addEventListener("click", function () {
     resizerRow.className = "resizer-row";
     td.appendChild(resizerRow);
 
-    row.appendChild(td);
+    tr.appendChild(td);
 
     // Re-apply event listeners for resizing
     resizerCol.addEventListener("mousedown", function (e) {
@@ -253,6 +320,7 @@ document.getElementById("addColBtn").addEventListener("click", function () {
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     });
-  });
+  }
+  document.getElementById("contextMenu").style.display = 'none';
 });
 
