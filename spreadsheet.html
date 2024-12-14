@@ -14,20 +14,22 @@
 
     <!-- Table container -->
     <div class="container">
-        <table id="spreadsheet"></table>
+        <table id="spreadsheet">
+            <!-- Table will be dynamically generated here -->
+        </table>
     </div>
 
     <!-- Footer Section -->
     <div id="footer">
-        For support and code base:<a target="_blank" href="https://arunsyoga.in/extentions.html">HahsPalLabs</a>.
+        For support and code base: <a target="_blank" href="https://arunsyoga.in/extentions.html">HahsPalLabs</a>.
     </div>
 
-    <!-- Right-click menu for row/column delete -->
+    <!-- Right-click menu for row/column delete and add -->
     <div id="contextMenu" style="display: none; position: absolute; background: #fff; border: 1px solid #ddd; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
-        <button id="deleteRowBtn">Delete Row</button>
-        <button id="deleteColBtn">Delete Column</button>
+        <button id="addRowBtn">Add Row</button>
+        <button id="addColBtn">Add Column</button>
     </div>
-
+    
   <script src="spreadsheet.js"></script>
 </body>
 </html>
