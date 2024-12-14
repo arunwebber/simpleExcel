@@ -80,7 +80,7 @@ To make the extension compatible with Firefox, replace the contents of your `man
     }
   },
   "background": {
-    "service_worker": "background.js"
+    "scripts": ["background.js"]
   },
   "icons": {
     "16": "images/icon_16.png",
