@@ -363,3 +363,13 @@ table.addEventListener("input", saveToLocalStorage);
 
 // Load the saved state when the page loads
 document.addEventListener("DOMContentLoaded", loadFromLocalStorage);
+
+document.addEventListener('DOMContentLoaded', function() {
+  const clearButton = document.getElementById('clearBtn');
+
+  clearButton.addEventListener('click', function() {
+      console.log('Clearing localStorage...');
+      localStorage.clear();  // Clear the localStorage
+      location.reload();     // Reload the page
+  });
+});
