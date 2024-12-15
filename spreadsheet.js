@@ -20,103 +20,111 @@ function getColumnName(colIndex) {
 }
 
 // Modify the table creation to use Excel-style column naming
-function createTable() {
-  table.innerHTML = ""; // Clear any existing table content
-
-  // Create column headers (A, B, C, D, ..., Z, AA, AB, ...)
+// Function to create a table header row
+function createHeaderRow() {
   const headerRow = document.createElement("tr");
   headerRow.appendChild(document.createElement("th")); // Top-left corner empty cell
+  
   for (let col = 1; col <= numCols; col++) {
     const th = document.createElement("th");
-    th.textContent = getColumnName(col); // Use Excel-style column names
+    th.textContent = getColumnName(col); // Excel-style column names
     headerRow.appendChild(th);
   }
+  return headerRow;
+}
+
+// Function to create a data cell with input and resizers
+function createDataCell() {
+  const td = document.createElement("td");
+
+  // Input field for cell content
+  const input = document.createElement("input");
+  input.type = "text";
+  td.appendChild(input);
+
+  // Resizers for columns and rows
+  td.appendChild(createResizer("resizer", "width", td));  // For column resizing
+  td.appendChild(createResizer("resizer-row", "height", td)); // For row resizing
+
+  return td;
+}
+
+// Function to create a resizer for column or row
+function createResizer(className, dimension, td) {
+  const resizer = document.createElement("div");
+  resizer.className = className;
+
+  resizer.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    const start = dimension === "width" ? e.clientX : e.clientY;
+    const startSize = dimension === "width" ? td.offsetWidth : td.offsetHeight;
+
+    function onMouseMove(e) {
+      const newSize = dimension === "width"
+        ? startSize + (e.clientX - start)
+        : startSize + (e.clientY - start);
+
+      // Apply the new size to the corresponding dimension (width or height)
+      if (dimension === "width") {
+        td.style.width = `${newSize}px`;
+      } else {
+        td.style.height = `${newSize}px`;
+      }
+    }
+
+    function onMouseUp() {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  });
+
+  return resizer;
+}
+
+// Function to create a table row with data cells
+function createTableRow(row) {
+  const tr = document.createElement("tr");
+
+  // Row header (row number)
+  const rowHeader = document.createElement("th");
+  rowHeader.textContent = row + 1; // Row number
+  tr.appendChild(rowHeader);
+
+  // Create data cells for each column
+  for (let col = 0; col < numCols; col++) {
+    const td = createDataCell();
+
+    // Add event listener to highlight row and column
+    td.addEventListener("click", function () {
+      document.querySelectorAll(".highlight-row").forEach(row => row.classList.remove("highlight-row"));
+      document.querySelectorAll(".highlight-col").forEach(col => col.classList.remove("highlight-col"));
+      highlightRowAndColumn(row, col);
+    });
+
+    tr.appendChild(td);
+  }
+
+  return tr;
+}
+
+// Main function to create the table
+function createTable() {
+  table.innerHTML = ""; // Clear existing content
+
+  // Create and append header row
+  const headerRow = createHeaderRow();
   table.appendChild(headerRow);
 
-  // Generate the table rows with row numbers (1, 2, 3, 4, ...)
+  // Create and append table body rows
   for (let row = 0; row < numRows; row++) {
-    const tr = document.createElement("tr");
-
-    // Row header (1, 2, 3, 4, ...)
-    const rowHeader = document.createElement("th");
-    rowHeader.textContent = row + 1; // Row numbers as digits (1, 2, 3, ...)
-    tr.appendChild(rowHeader);
-
-    // Create data cells for each column
-    for (let col = 0; col < numCols; col++) {
-      const td = document.createElement("td");
-
-      // Create input for cell content
-      const input = document.createElement("input");
-      input.type = "text";
-      td.appendChild(input);
-
-      // Create resizer for columns
-      const resizerCol = document.createElement("div");
-      resizerCol.className = "resizer";
-      td.appendChild(resizerCol);
-
-      // Create resizer for rows
-      const resizerRow = document.createElement("div");
-      resizerRow.className = "resizer-row";
-      td.appendChild(resizerRow);
-
-      // Append cell to row
-      tr.appendChild(td);
-
-      // Handle column resizing
-      resizerCol.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        const startX = e.clientX;
-        const startWidth = td.offsetWidth;
-
-        function onMouseMove(e) {
-          const newWidth = startWidth + (e.clientX - startX);
-          td.style.width = `${newWidth}px`;
-        }
-
-        function onMouseUp() {
-          document.removeEventListener("mousemove", onMouseMove);
-          document.removeEventListener("mouseup", onMouseUp);
-        }
-
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
-      });
-
-      // Handle row resizing
-      resizerRow.addEventListener("mousedown", function (e) {
-        e.preventDefault();
-        const startY = e.clientY;
-        const startHeight = td.offsetHeight;
-
-        function onMouseMove(e) {
-          const newHeight = startHeight + (e.clientY - startY);
-          td.style.height = `${newHeight}px`;
-        }
-
-        function onMouseUp() {
-          document.removeEventListener("mousemove", onMouseMove);
-          document.removeEventListener("mouseup", onMouseUp);
-        }
-
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
-      });
-
-      // Add event listener for cell click to highlight row and column
-      td.addEventListener("click", function () {
-        // Remove highlights from previous selected row and column
-        document.querySelectorAll(".highlight-row").forEach(row => row.classList.remove("highlight-row"));
-        document.querySelectorAll(".highlight-col").forEach(col => col.classList.remove("highlight-col"));
-
-        // Highlight the corresponding row and column
-        highlightRowAndColumn(row, col);
-      });
-    }
-    table.appendChild(tr);
+    const tableRow = createTableRow(row);
+    table.appendChild(tableRow);
   }
 }
+
 
 // Function to highlight the row and column
 function highlightRowAndColumn(row, col) {
@@ -131,196 +139,227 @@ function highlightRowAndColumn(row, col) {
 
 // Initial table creation
 createTable();
-
 // Show context menu
 function showContextMenu(event) {
   const cell = event.target;
 
-  // Determine whether the clicked element is a row header or column header
   if (cell.tagName === 'TH') {
-    // Check if the clicked element is a row header (first column)
-    if (cell.parentElement === table.querySelector("tr:first-child")) {
-      // Right-clicked on the column header, show Add Column
-      document.getElementById("addRowBtn").style.display = 'none'; // Hide Add Row
-      document.getElementById("addColBtn").style.display = 'block'; // Show Add Column
-    } else {
-      // Right-clicked on the row header, show Add Row
-      document.getElementById("addRowBtn").style.display = 'block'; // Show Add Row
-      document.getElementById("addColBtn").style.display = 'none'; // Hide Add Column
-    }
+    // Show Add Row or Add Column based on the clicked header
+    const isColumnHeader = cell.parentElement === table.querySelector("tr:first-child");
+    document.getElementById("addRowBtn").style.display = isColumnHeader ? 'none' : 'block';
+    document.getElementById("addColBtn").style.display = isColumnHeader ? 'block' : 'none';
 
     // Show context menu
     contextMenu.style.display = 'block';
     contextMenu.style.left = `${event.pageX}px`;
     contextMenu.style.top = `${event.pageY}px`;
 
-    // Get the row and column index
-    if (cell.parentElement === table.querySelector("tr:first-child")) {
-      // Column header clicked
-      const colIndex = Array.from(cell.parentElement.children).indexOf(cell);
-      selectedRow = null; // Reset selected row
-      selectedCol = colIndex;
+    // Set the selected row/column
+    if (isColumnHeader) {
+      selectedRow = null;
+      selectedCol = Array.from(cell.parentElement.children).indexOf(cell);
     } else {
-      // Row header clicked
-      const rowIndex = Array.from(cell.parentElement.children).indexOf(cell);
-      selectedRow = rowIndex;
-      selectedCol = null; // Reset selected column
+      selectedRow = Array.from(cell.parentElement.children).indexOf(cell);
+      selectedCol = null;
     }
   } else {
-    // If the right-click is on a table cell, reset the context menu
-    contextMenu.style.display = 'none';
+    contextMenu.style.display = 'none'; // Hide context menu if right-clicked on a table cell
   }
 }
 
-// Event listener to show context menu on right click
-table.addEventListener('contextmenu', function (event) {
+// Event listener for context menu on right-click
+table.addEventListener('contextmenu', (event) => {
   event.preventDefault();
   showContextMenu(event);
 });
 
 // Hide context menu on click anywhere
-document.addEventListener('click', function () {
-  contextMenu.style.display = 'none';
-});
+document.addEventListener('click', () => contextMenu.style.display = 'none');
 
-// Function to add a new row
-document.getElementById("addRowBtn").addEventListener("click", function () {
-  numRows++;  // Increase the number of rows
+// Function to handle adding a row or column
+function addElement(isRow) {
   const tr = document.createElement("tr");
+  
+  // Add header or cells
+  if (isRow) {
+    const rowHeader = document.createElement("th");
+    rowHeader.textContent = numRows + 1;
+    tr.appendChild(rowHeader);
 
-  // Create new row header (row number)
-  const rowHeader = document.createElement("th");
-  rowHeader.textContent = numRows; // Update row number dynamically
-  tr.appendChild(rowHeader);
+    for (let col = 0; col < numCols; col++) {
+      tr.appendChild(createCell());
+    }
+    table.appendChild(tr);
+    numRows++;
+  } else {
+    const headerRow = table.querySelector("tr:first-child");
+    const th = document.createElement("th");
+    th.textContent = getColumnName(numCols + 1);
+    headerRow.appendChild(th);
 
-  // Add new cells for each column
-  for (let col = 0; col < numCols; col++) {
-    const td = document.createElement("td");
-    const input = document.createElement("input");
-    input.type = "text";
-    td.appendChild(input);
-
-    // Add resizer divs
-    const resizerCol = document.createElement("div");
-    resizerCol.className = "resizer";
-    td.appendChild(resizerCol);
-    const resizerRow = document.createElement("div");
-    resizerRow.className = "resizer-row";
-    td.appendChild(resizerRow);
-
-    tr.appendChild(td);
-
-    // Re-apply event listeners for resizing
-    resizerCol.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = td.offsetWidth;
-
-      function onMouseMove(e) {
-        const newWidth = startWidth + (e.clientX - startX);
-        td.style.width = `${newWidth}px`;
-      }
-
-      function onMouseUp() {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      }
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
-
-    resizerRow.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = td.offsetHeight;
-
-      function onMouseMove(e) {
-        const newHeight = startHeight + (e.clientY - startY);
-        td.style.height = `${newHeight}px`;
-      }
-
-      function onMouseUp() {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      }
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
+    for (let row = 1; row <= numRows; row++) {
+      const td = createCell();
+      table.querySelectorAll("tr")[row].appendChild(td);
+    }
+    numCols++;
   }
 
-  table.appendChild(tr);
   document.getElementById("contextMenu").style.display = 'none';
-});
+}
 
-// Function to add a new column
-document.getElementById("addColBtn").addEventListener("click", function () {
-  numCols++;  // Increase the number of columns
+// Create a new cell with input and resizer functionality
+function createCell() {
+  const td = document.createElement("td");
+  const input = document.createElement("input");
+  input.type = "text";
+  td.appendChild(input);
 
-  // Update the column headers
-  const headerRow = table.querySelector("tr:first-child");
-  const th = document.createElement("th");
-  th.textContent = getColumnName(numCols); // Add new column header dynamically
-  headerRow.appendChild(th);
+  // Add resizer divs
+  ['resizer', 'resizer-row'].forEach(className => {
+    const resizer = document.createElement("div");
+    resizer.className = className;
+    td.appendChild(resizer);
 
-  // Add a new cell in each existing row
-  for (let row = 1; row <= numRows; row++) {
-    const tr = table.querySelectorAll("tr")[row];
-    const td = document.createElement("td");
-    const input = document.createElement("input");
-    input.type = "text";
-    td.appendChild(input);
+    resizer.addEventListener("mousedown", (e) => resizeCell(e, td, className));
+  });
 
-    // Add resizer divs
-    const resizerCol = document.createElement("div");
-    resizerCol.className = "resizer";
-    td.appendChild(resizerCol);
-    const resizerRow = document.createElement("div");
-    resizerRow.className = "resizer-row";
-    td.appendChild(resizerRow);
+  return td;
+}
 
-    tr.appendChild(td);
+// Handle resizing logic
+function resizeCell(e, td, direction) {
+  e.preventDefault();
+  const startPos = direction === 'resizer' ? e.clientX : e.clientY;
+  const startSize = direction === 'resizer' ? td.offsetWidth : td.offsetHeight;
 
-    // Re-apply event listeners for resizing
-    resizerCol.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      const startX = e.clientX;
-      const startWidth = td.offsetWidth;
+  const onMouseMove = (e) => {
+    const newSize = direction === 'resizer' ? startSize + (e.clientX - startPos) : startSize + (e.clientY - startPos);
+    direction === 'resizer' ? td.style.width = `${newSize}px` : td.style.height = `${newSize}px`;
+  };
 
-      function onMouseMove(e) {
-        const newWidth = startWidth + (e.clientX - startX);
-        td.style.width = `${newWidth}px`;
-      }
+  const onMouseUp = () => {
+    document.removeEventListener("mousemove", onMouseMove);
+    document.removeEventListener("mouseup", onMouseUp);
+  };
 
-      function onMouseUp() {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      }
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
+}
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
+// Add row and column button event listeners
+document.getElementById("addRowBtn").addEventListener("click", () => addElement(true));
+document.getElementById("addColBtn").addEventListener("click", () => addElement(false));
 
-    resizerRow.addEventListener("mousedown", function (e) {
-      e.preventDefault();
-      const startY = e.clientY;
-      const startHeight = td.offsetHeight;
 
-      function onMouseMove(e) {
-        const newHeight = startHeight + (e.clientY - startY);
-        td.style.height = `${newHeight}px`;
-      }
+let history = []; // Stack for undo/redo history
+let historyIndex = -1; // Keeps track of the current position in the history stack
+let isUndoingOrRedoing = false; // Flag to avoid redundant changes during undo/redo
 
-      function onMouseUp() {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      }
+// Save the current state of the table (called after every modification)
+function saveState() {
+  if (isUndoingOrRedoing) return; // Avoid saving state during undo/redo
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
+  // Get the current state of the table (e.g., cells and their values)
+  const currentState = [];
+  const rows = table.querySelectorAll('tr');
+  rows.forEach((row, rowIndex) => {
+    const cells = row.querySelectorAll('td input');
+    const rowData = [];
+    cells.forEach(cell => rowData.push(cell.value));
+    currentState.push(rowData);
+  });
+
+  // Check if we are undoing and avoid adding to history
+  if (historyIndex < history.length - 1) {
+    // Slice off the "redo" stack after the current position
+    history = history.slice(0, historyIndex + 1);
   }
-  document.getElementById("contextMenu").style.display = 'none';
+
+  // Only add to history if there has been a change (non-initial state)
+  if (historyIndex === -1 || JSON.stringify(currentState) !== JSON.stringify(history[historyIndex])) {
+    history.push(currentState);
+    historyIndex++;
+  }
+
+  // Optionally, limit the history length (e.g., max 50 states)
+  if (history.length > 50) history.shift(); // Limit the history length
+}
+
+// Undo the last change
+function undo() {
+  if (historyIndex > 0) {
+    isUndoingOrRedoing = true;
+    historyIndex--; // Move the index backward
+    loadState(history[historyIndex]);
+    isUndoingOrRedoing = false;
+  }
+}
+
+// Redo the undone change
+function redo() {
+  if (historyIndex < history.length - 1) {
+    isUndoingOrRedoing = true;
+    historyIndex++; // Move the index forward
+    loadState(history[historyIndex]);
+    isUndoingOrRedoing = false;
+  }
+}
+
+// Load a given state into the table
+function loadState(state) {
+  const rows = table.querySelectorAll('tr');
+  rows.forEach((row, rowIndex) => {
+    const cells = row.querySelectorAll('td input');
+    state[rowIndex].forEach((value, colIndex) => {
+      cells[colIndex].value = value;
+    });
+  });
+}
+
+// Listen for keyboard shortcuts (Ctrl+Z for Undo, Ctrl+Y for Redo)
+document.addEventListener("keydown", function(event) {
+  if (event.ctrlKey || event.metaKey) {
+    if (event.key === "z" || event.key === "Z") {
+      undo();  // Trigger undo on Ctrl+Z
+    } else if (event.key === "y" || event.key === "Y") {
+      redo();  // Trigger redo on Ctrl+Y
+    }
+  }
 });
 
+// Call saveState after any modification in the table (e.g., after cell editing)
+table.addEventListener("input", saveState);
+
+// Save initial state after creating the table
+createTable();
+saveState();
+
+
+// Function to save the current state to localStorage
+function saveToLocalStorage() {
+  const currentState = [];
+  const rows = table.querySelectorAll('tr');
+  rows.forEach((row, rowIndex) => {
+    const cells = row.querySelectorAll('td input');
+    const rowData = [];
+    cells.forEach(cell => rowData.push(cell.value));
+    currentState.push(rowData);
+  });
+  
+  localStorage.setItem("tableState", JSON.stringify(currentState));
+}
+
+// Function to load the saved state from localStorage
+function loadFromLocalStorage() {
+  const savedState = localStorage.getItem("tableState");
+  if (savedState) {
+    const state = JSON.parse(savedState);
+    loadState(state);
+  }
+}
+
+// Save the table state on input change
+table.addEventListener("input", saveToLocalStorage);
+
+// Load the saved state when the page loads
+document.addEventListener("DOMContentLoaded", loadFromLocalStorage);
