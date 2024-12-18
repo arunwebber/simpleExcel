@@ -1,375 +1,379 @@
-// Define default values for rows and columns
-let numRows = 25; // Set initial number of rows
-let numCols = 25; // Set initial number of columns
-
-const table = document.getElementById("spreadsheet");
-const contextMenu = document.getElementById('contextMenu');
-let selectedRow = null;
-let selectedCol = null;
-
-// Function to get the Excel-style column name (A, B, C, ..., Z, AA, AB, ..., AZ, BA, ...)
-function getColumnName(colIndex) {
-  let columnName = '';
-  while (colIndex > 0) {
-    const remainder = (colIndex - 1) % 26;  // Get remainder (0 = A, 1 = B, ..., 25 = Z)
-    let letter = String.fromCharCode(65 + remainder);  // Directly get the character
-    columnName = letter + columnName;  // Prepend the character to the column name
-    colIndex = Math.floor((colIndex - 1) / 26);  // Update colIndex for the next significant letter
+class StorageManager {
+  // Save data to localStorage
+  static saveToLocalStorage(key, value) {
+      localStorage.setItem(key, value);
   }
-  return columnName;
-}
 
-// Modify the table creation to use Excel-style column naming
-// Function to create a table header row
-function createHeaderRow() {
-  const headerRow = document.createElement("tr");
-  headerRow.appendChild(document.createElement("th")); // Top-left corner empty cell
-  
-  for (let col = 1; col <= numCols; col++) {
-    const th = document.createElement("th");
-    th.textContent = getColumnName(col); // Excel-style column names
-    headerRow.appendChild(th);
+  // Retrieve data from localStorage
+  static getFromLocalStorage(key, defaultValue = '') {
+      return localStorage.getItem(key) || defaultValue;
   }
-  return headerRow;
 }
 
-// Function to create a data cell with input and resizers
-function createDataCell() {
-  const td = document.createElement("td");
+class InputManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+  }
 
-  // Input field for cell content
-  const input = document.createElement("input");
-  input.type = "text";
-  td.appendChild(input);
+  handleCellInput(event) {
+    const input = event.target;
+    const td = input.parentElement;
+    const row = td.parentElement;
+    const col = Array.from(row.children).indexOf(td) - 1; // Index of column in the row
+    const rowIndex = Array.from(this.spreadsheet.table.children).indexOf(row) - 1; // Index of row in the table
 
-  // Resizers for columns and rows
-  td.appendChild(createResizer("resizer", "width", td));  // For column resizing
-  td.appendChild(createResizer("resizer-row", "height", td)); // For row resizing
-
-  return td;
+    // Save the current input state in the history
+    this.spreadsheet.saveState();
+  }
 }
 
-// Function to create a resizer for column or row
-function createResizer(className, dimension, td) {
-  const resizer = document.createElement("div");
-  resizer.className = className;
+class KeyboardShortcutManager {
+  constructor(noteElement) {
+    this.noteElement = noteElement;
+    this.undoStack = [];
+    this.redoStack = [];
+  }
 
-  resizer.addEventListener("mousedown", function (e) {
+  // Save the current state to undo stack
+  saveState() {
+    this.undoStack.push(this.noteElement.innerText);
+    if (this.undoStack.length > 50) {
+      this.undoStack.shift(); // Keep the stack size manageable
+    }
+    this.redoStack = []; // Clear redo stack after a new action
+  }
+
+  // Undo the last action
+  undo() {
+    if (this.undoStack.length > 0) {
+      const lastState = this.undoStack.pop();
+      this.redoStack.push(this.noteElement.innerText);
+      this.noteElement.innerText = lastState;
+      StorageManager.saveToLocalStorage('savedNote', this.noteElement.innerText);
+    }
+  }
+
+  // Redo the last undone action
+  redo() {
+    if (this.redoStack.length > 0) {
+      const lastState = this.redoStack.pop();
+      this.undoStack.push(this.noteElement.innerText);
+      this.noteElement.innerText = lastState;
+      StorageManager.saveToLocalStorage('savedNote', this.noteElement.innerText);
+    }
+  }
+
+  // Handle keyboard shortcuts for undo and redo
+  handleKeyboardShortcuts(event) {
+    if (event.ctrlKey) {
+      if (event.key === 'z' || event.key === 'Z') {
+        event.preventDefault();
+        this.undo(); // Perform undo action
+      } else if (event.key === 'y' || event.key === 'Y') {
+        event.preventDefault();
+        this.redo(); // Perform redo action
+      }
+    }
+  }
+}
+
+class LintingManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+  }
+
+  highlightRowAndColumn(row, col) {
+    // Highlight the row header
+    const rowHeader = this.spreadsheet.table.querySelectorAll("tr")[row + 1].querySelector("th");
+    rowHeader.classList.add("highlight-row");
+
+    // Highlight the column header
+    const headerCells = this.spreadsheet.table.querySelectorAll("tr:first-child th");
+    headerCells[col + 1].classList.add("highlight-col");
+  }
+
+  clearHighlighting() {
+    // Remove highlighting from all rows and columns
+    document.querySelectorAll(".highlight-row").forEach((row) => row.classList.remove("highlight-row"));
+    document.querySelectorAll(".highlight-col").forEach((col) => col.classList.remove("highlight-col"));
+  }
+}
+
+class ContextMenuManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+    this.contextMenu = document.getElementById('contextMenu');
+    this.selectedRow = null;
+    this.selectedCol = null;
+    this.addEventListeners();
+  }
+
+  addEventListeners() {
+    this.spreadsheet.table.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      this.showContextMenu(event);
+    });
+
+    document.addEventListener("click", () => this.contextMenu.style.display = 'none');
+  }
+
+  showContextMenu(event) {
+    const cell = event.target;
+
+    if (cell.tagName === 'TH') {
+      const isColumnHeader = cell.parentElement === this.spreadsheet.table.querySelector("tr:first-child");
+      document.getElementById("addRowBtn").style.display = isColumnHeader ? 'none' : 'block';
+      document.getElementById("addColBtn").style.display = isColumnHeader ? 'block' : 'none';
+
+      this.contextMenu.style.display = 'block';
+      this.contextMenu.style.left = `${event.pageX}px`;
+      this.contextMenu.style.top = `${event.pageY}px`;
+
+      if (isColumnHeader) {
+        this.selectedRow = null;
+        this.selectedCol = Array.from(cell.parentElement.children).indexOf(cell);
+      } else {
+        this.selectedRow = Array.from(cell.parentElement.children).indexOf(cell);
+        this.selectedCol = null;
+      }
+    } else {
+      this.contextMenu.style.display = 'none';
+    }
+  }
+
+  getSelectedRow() {
+    return this.selectedRow;
+  }
+
+  getSelectedCol() {
+    return this.selectedCol;
+  }
+}
+
+class TableManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+    this.table = spreadsheet.table;
+  }
+
+  createHeaderRow() {
+    const headerRow = document.createElement("tr");
+    headerRow.appendChild(document.createElement("th"));
+    for (let col = 1; col <= this.spreadsheet.numCols; col++) {
+      const th = document.createElement("th");
+      th.textContent = this.spreadsheet.getColumnName(col);
+      headerRow.appendChild(th);
+    }
+    return headerRow;
+  }
+
+  createDataCell() {
+    const td = document.createElement("td");
+    const input = document.createElement("input");
+    input.type = "text";
+    td.appendChild(input);
+
+    td.appendChild(this.createResizer("resizer", "width", td));
+    td.appendChild(this.createResizer("resizer-row", "height", td));
+
+    return td;
+  }
+
+  createResizer(className, dimension, td) {
+    const resizer = document.createElement("div");
+    resizer.className = className;
+
+    resizer.addEventListener("mousedown", (e) => this.handleResize(e, dimension, td));
+    return resizer;
+  }
+
+  handleResize(e, dimension, td) {
     e.preventDefault();
     const start = dimension === "width" ? e.clientX : e.clientY;
     const startSize = dimension === "width" ? td.offsetWidth : td.offsetHeight;
 
-    function onMouseMove(e) {
+    const onMouseMove = (e) => {
       const newSize = dimension === "width"
         ? startSize + (e.clientX - start)
         : startSize + (e.clientY - start);
 
-      // Apply the new size to the corresponding dimension (width or height)
       if (dimension === "width") {
         td.style.width = `${newSize}px`;
       } else {
         td.style.height = `${newSize}px`;
       }
-    }
+    };
 
-    function onMouseUp() {
+    const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-    }
+    };
 
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
-  });
-
-  return resizer;
-}
-
-// Function to create a table row with data cells
-function createTableRow(row) {
-  const tr = document.createElement("tr");
-
-  // Row header (row number)
-  const rowHeader = document.createElement("th");
-  rowHeader.textContent = row + 1; // Row number
-  tr.appendChild(rowHeader);
-
-  // Create data cells for each column
-  for (let col = 0; col < numCols; col++) {
-    const td = createDataCell();
-
-    // Add event listener to highlight row and column
-    td.addEventListener("click", function () {
-      document.querySelectorAll(".highlight-row").forEach(row => row.classList.remove("highlight-row"));
-      document.querySelectorAll(".highlight-col").forEach(col => col.classList.remove("highlight-col"));
-      highlightRowAndColumn(row, col);
-    });
-
-    tr.appendChild(td);
   }
 
-  return tr;
-}
-
-// Main function to create the table
-function createTable() {
-  table.innerHTML = ""; // Clear existing content
-
-  // Create and append header row
-  const headerRow = createHeaderRow();
-  table.appendChild(headerRow);
-
-  // Create and append table body rows
-  for (let row = 0; row < numRows; row++) {
-    const tableRow = createTableRow(row);
-    table.appendChild(tableRow);
-  }
-}
-
-
-// Function to highlight the row and column
-function highlightRowAndColumn(row, col) {
-  // Highlight the selected row
-  const rowHeader = table.querySelectorAll("tr")[row + 1].querySelector("th");
-  rowHeader.classList.add("highlight-row");
-
-  // Highlight the selected column
-  const headerCells = table.querySelectorAll("tr:first-child th");
-  headerCells[col + 1].classList.add("highlight-col");
-}
-
-// Initial table creation
-createTable();
-// Show context menu
-function showContextMenu(event) {
-  const cell = event.target;
-
-  if (cell.tagName === 'TH') {
-    // Show Add Row or Add Column based on the clicked header
-    const isColumnHeader = cell.parentElement === table.querySelector("tr:first-child");
-    document.getElementById("addRowBtn").style.display = isColumnHeader ? 'none' : 'block';
-    document.getElementById("addColBtn").style.display = isColumnHeader ? 'block' : 'none';
-
-    // Show context menu
-    contextMenu.style.display = 'block';
-    contextMenu.style.left = `${event.pageX}px`;
-    contextMenu.style.top = `${event.pageY}px`;
-
-    // Set the selected row/column
-    if (isColumnHeader) {
-      selectedRow = null;
-      selectedCol = Array.from(cell.parentElement.children).indexOf(cell);
-    } else {
-      selectedRow = Array.from(cell.parentElement.children).indexOf(cell);
-      selectedCol = null;
-    }
-  } else {
-    contextMenu.style.display = 'none'; // Hide context menu if right-clicked on a table cell
-  }
-}
-
-// Event listener for context menu on right-click
-table.addEventListener('contextmenu', (event) => {
-  event.preventDefault();
-  showContextMenu(event);
-});
-
-// Hide context menu on click anywhere
-document.addEventListener('click', () => contextMenu.style.display = 'none');
-
-// Function to handle adding a row or column
-function addElement(isRow) {
-  const tr = document.createElement("tr");
-  
-  // Add header or cells
-  if (isRow) {
+  createTableRow(row) {
+    const tr = document.createElement("tr");
     const rowHeader = document.createElement("th");
-    rowHeader.textContent = numRows + 1;
+    rowHeader.textContent = row + 1;
     tr.appendChild(rowHeader);
 
-    for (let col = 0; col < numCols; col++) {
-      tr.appendChild(createCell());
+    for (let col = 0; col < this.spreadsheet.numCols; col++) {
+      const td = this.createDataCell();
+      td.addEventListener("click", () => {
+        this.spreadsheet.lintingManager.clearHighlighting();  // Clear existing highlights
+        this.spreadsheet.lintingManager.highlightRowAndColumn(row, col);  // Highlight the clicked row and column
+      });
+
+      td.querySelector("input").addEventListener("input", (e) => this.spreadsheet.inputManager.handleCellInput(e)); // Handle input
+      tr.appendChild(td);
     }
-    table.appendChild(tr);
-    numRows++;
-  } else {
-    const headerRow = table.querySelector("tr:first-child");
-    const th = document.createElement("th");
-    th.textContent = getColumnName(numCols + 1);
-    headerRow.appendChild(th);
 
-    for (let row = 1; row <= numRows; row++) {
-      const td = createCell();
-      table.querySelectorAll("tr")[row].appendChild(td);
+    return tr;
+  }
+
+  createTable() {
+    this.table.innerHTML = "";
+    const headerRow = this.createHeaderRow();
+    this.table.appendChild(headerRow);
+
+    for (let row = 0; row < this.spreadsheet.numRows; row++) {
+      const tableRow = this.createTableRow(row);
+      this.table.appendChild(tableRow);
     }
-    numCols++;
   }
 
-  document.getElementById("contextMenu").style.display = 'none';
-}
+  addElement(isRow) {
+    const tr = document.createElement("tr");
 
-// Create a new cell with input and resizer functionality
-function createCell() {
-  const td = document.createElement("td");
-  const input = document.createElement("input");
-  input.type = "text";
-  td.appendChild(input);
+    if (isRow) {
+      const rowHeader = document.createElement("th");
+      rowHeader.textContent = this.spreadsheet.numRows + 1;
+      tr.appendChild(rowHeader);
 
-  // Add resizer divs
-  ['resizer', 'resizer-row'].forEach(className => {
-    const resizer = document.createElement("div");
-    resizer.className = className;
-    td.appendChild(resizer);
+      for (let col = 0; col < this.spreadsheet.numCols; col++) {
+        tr.appendChild(this.createDataCell());
+      }
+      this.table.appendChild(tr);
+      this.spreadsheet.numRows++;
+    } else {
+      const headerRow = this.table.querySelector("tr:first-child");
+      const th = document.createElement("th");
+      th.textContent = this.spreadsheet.getColumnName(this.spreadsheet.numCols + 1);
+      headerRow.appendChild(th);
 
-    resizer.addEventListener("mousedown", (e) => resizeCell(e, td, className));
-  });
+      for (let row = 1; row <= this.spreadsheet.numRows; row++) {
+        const td = this.createDataCell();
+        this.table.querySelectorAll("tr")[row].appendChild(td);
+      }
+      this.spreadsheet.numCols++;
+    }
 
-  return td;
-}
-
-// Handle resizing logic
-function resizeCell(e, td, direction) {
-  e.preventDefault();
-  const startPos = direction === 'resizer' ? e.clientX : e.clientY;
-  const startSize = direction === 'resizer' ? td.offsetWidth : td.offsetHeight;
-
-  const onMouseMove = (e) => {
-    const newSize = direction === 'resizer' ? startSize + (e.clientX - startPos) : startSize + (e.clientY - startPos);
-    direction === 'resizer' ? td.style.width = `${newSize}px` : td.style.height = `${newSize}px`;
-  };
-
-  const onMouseUp = () => {
-    document.removeEventListener("mousemove", onMouseMove);
-    document.removeEventListener("mouseup", onMouseUp);
-  };
-
-  document.addEventListener("mousemove", onMouseMove);
-  document.addEventListener("mouseup", onMouseUp);
-}
-
-// Add row and column button event listeners
-document.getElementById("addRowBtn").addEventListener("click", () => addElement(true));
-document.getElementById("addColBtn").addEventListener("click", () => addElement(false));
-
-
-let history = []; // Stack for undo/redo history
-let historyIndex = -1; // Keeps track of the current position in the history stack
-let isUndoingOrRedoing = false; // Flag to avoid redundant changes during undo/redo
-
-// Save the current state of the table (called after every modification)
-function saveState() {
-  if (isUndoingOrRedoing) return; // Avoid saving state during undo/redo
-
-  // Get the current state of the table (e.g., cells and their values)
-  const currentState = [];
-  const rows = table.querySelectorAll('tr');
-  rows.forEach((row, rowIndex) => {
-    const cells = row.querySelectorAll('td input');
-    const rowData = [];
-    cells.forEach(cell => rowData.push(cell.value));
-    currentState.push(rowData);
-  });
-
-  // Check if we are undoing and avoid adding to history
-  if (historyIndex < history.length - 1) {
-    // Slice off the "redo" stack after the current position
-    history = history.slice(0, historyIndex + 1);
+    this.spreadsheet.contextMenuManager.contextMenu.style.display = 'none';
   }
 
-  // Only add to history if there has been a change (non-initial state)
-  if (historyIndex === -1 || JSON.stringify(currentState) !== JSON.stringify(history[historyIndex])) {
-    history.push(currentState);
-    historyIndex++;
-  }
-
-  // Optionally, limit the history length (e.g., max 50 states)
-  if (history.length > 50) history.shift(); // Limit the history length
-}
-
-// Undo the last change
-function undo() {
-  if (historyIndex > 0) {
-    isUndoingOrRedoing = true;
-    historyIndex--; // Move the index backward
-    loadState(history[historyIndex]);
-    isUndoingOrRedoing = false;
+  clearTable() {
+    const inputs = this.table.querySelectorAll("td input");
+    inputs.forEach(input => input.value = '');
   }
 }
 
-// Redo the undone change
-function redo() {
-  if (historyIndex < history.length - 1) {
-    isUndoingOrRedoing = true;
-    historyIndex++; // Move the index forward
-    loadState(history[historyIndex]);
-    isUndoingOrRedoing = false;
-  }
-}
+class Spreadsheet {
+  constructor(numRows = 25, numCols = 25) {
+    this.numRows = numRows;
+    this.numCols = numCols;
+    this.table = document.getElementById("spreadsheet");
+    this.history = [];
+    this.historyIndex = -1;
+    this.isUndoingOrRedoing = false;
 
-// Load a given state into the table
-function loadState(state) {
-  const rows = table.querySelectorAll('tr');
-  rows.forEach((row, rowIndex) => {
-    const cells = row.querySelectorAll('td input');
-    state[rowIndex].forEach((value, colIndex) => {
-      cells[colIndex].value = value;
+    this.inputManager = new InputManager(this);
+    this.keyboardShortcutManager = new KeyboardShortcutManager(this.table);
+    this.lintingManager = new LintingManager(this);
+    this.contextMenuManager = new ContextMenuManager(this);
+    this.tableManager = new TableManager(this);
+
+    this.tableManager.createTable();
+    this.loadFromLocalStorage();  // Load from localStorage when initializing
+    this.addEventListeners();
+  }
+
+  // Simplified column name generation
+  getColumnName(colIndex) {
+    let columnName = '';
+    while (colIndex > 0) {
+      columnName = String.fromCharCode(65 + ((colIndex - 1) % 26)) + columnName;
+      colIndex = Math.floor((colIndex - 1) / 26);
+    }
+    return columnName;
+  }
+
+  // Save state with minimal check
+  saveState() {
+    if (this.isUndoingOrRedoing) return;
+
+    const currentState = Array.from(this.table.querySelectorAll('tr')).map(row =>
+      Array.from(row.querySelectorAll('td input')).map(cell => cell.value)
+    );
+
+    if (this.historyIndex < this.history.length - 1) {
+      this.history = this.history.slice(0, this.historyIndex + 1);
+    }
+
+    if (this.historyIndex === -1 || JSON.stringify(currentState) !== JSON.stringify(this.history[this.historyIndex])) {
+      this.history.push(currentState);
+      this.historyIndex++;
+    }
+
+    if (this.history.length > 50) this.history.shift();
+
+    // Save the current state to localStorage after each change
+    this.saveToLocalStorage(currentState);
+  }
+
+  undo() { this.keyboardShortcutManager.undo(); }
+
+  redo() { this.keyboardShortcutManager.redo(); }
+
+  loadState(state) {
+    const rows = this.table.querySelectorAll('tr');
+    rows.forEach((row, rowIndex) => {
+      const cells = row.querySelectorAll('td input');
+      state[rowIndex].forEach((value, colIndex) => cells[colIndex].value = value);
     });
-  });
-}
+  }
 
-// Listen for keyboard shortcuts (Ctrl+Z for Undo, Ctrl+Y for Redo)
-document.addEventListener("keydown", function(event) {
-  if (event.ctrlKey || event.metaKey) {
-    if (event.key === "z" || event.key === "Z") {
-      undo();  // Trigger undo on Ctrl+Z
-    } else if (event.key === "y" || event.key === "Y") {
-      redo();  // Trigger redo on Ctrl+Y
+  // Add event listeners for the table
+  addEventListeners() {
+    const addRowBtn = document.getElementById("addRowBtn");
+    const addColBtn = document.getElementById("addColBtn");
+    const clearBtn = document.getElementById("clearBtn");
+
+    addRowBtn?.addEventListener("click", () => this.tableManager.addElement(true));
+    addColBtn?.addEventListener("click", () => this.tableManager.addElement(false));
+    clearBtn?.addEventListener("click", () => {
+      this.tableManager.clearTable();
+      this.saveState();  // Clear table and save state (which will be empty)
+    });
+
+    this.table.addEventListener("input", () => this.saveState());
+  }
+
+  // Save state to localStorage
+  saveToLocalStorage(state) {
+    localStorage.setItem('spreadsheetData', JSON.stringify(state));
+  }
+
+  // Load data from localStorage
+  loadFromLocalStorage() {
+    const savedData = JSON.parse(localStorage.getItem('spreadsheetData'));
+    if (savedData) {
+      this.loadState(savedData);
     }
   }
-});
-
-// Call saveState after any modification in the table (e.g., after cell editing)
-table.addEventListener("input", saveState);
-
-// Save initial state after creating the table
-createTable();
-saveState();
-
-
-// Function to save the current state to localStorage
-function saveToLocalStorage() {
-  const currentState = [];
-  const rows = table.querySelectorAll('tr');
-  rows.forEach((row, rowIndex) => {
-    const cells = row.querySelectorAll('td input');
-    const rowData = [];
-    cells.forEach(cell => rowData.push(cell.value));
-    currentState.push(rowData);
-  });
-  
-  localStorage.setItem("tableState", JSON.stringify(currentState));
 }
 
-// Function to load the saved state from localStorage
-function loadFromLocalStorage() {
-  const savedState = localStorage.getItem("tableState");
-  if (savedState) {
-    const state = JSON.parse(savedState);
-    loadState(state);
-  }
-}
-
-// Save the table state on input change
-table.addEventListener("input", saveToLocalStorage);
-
-// Load the saved state when the page loads
-document.addEventListener("DOMContentLoaded", loadFromLocalStorage);
-
-document.addEventListener('DOMContentLoaded', function() {
-  const clearButton = document.getElementById('clearBtn');
-
-  clearButton.addEventListener('click', function() {
-      console.log('Clearing localStorage...');
-      localStorage.clear();  // Clear the localStorage
-      location.reload();     // Reload the page
-  });
-});
+// Create a new spreadsheet
+const spreadsheet = new Spreadsheet();
+spreadsheet.loadFromLocalStorage();
