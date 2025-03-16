@@ -29,11 +29,12 @@ Ensure the following files are present in the project directory:
 
 To install the extension in Chrome, follow these steps:
 
-1. Open **Chrome** and go to `chrome://extensions/`.
-2. Turn on **Developer Mode** by toggling the switch at the top-right of the Extensions page.
-3. Click the **Load unpacked** button.
-4. Navigate to the directory where you've saved the extension files (containing `index.html`, `style.css`, and `spreadsheet.js`) and select it.
-5. The extension should now be installed and visible on your Chrome Extensions page.
+1. Download the Extension:Clone this repository or download the ZIP.git clone git clone https://github.com/Krishnapriya462/browser-notepad.git
+2. cd browser-notepad
+3. Load as an Unpacked Extension:
+4. Open Chrome and go to chrome://extensions/
+5.  Developer mode (top right corner)
+6. Click "Load unpacked" and select the folder
 
 ### 4. Use the Extension
 
