@@ -29,11 +29,12 @@ Ensure the following files are present in the project directory:
 
 To install the extension in Chrome, follow these steps:
 
-1. Download the Extension:Clone this repository or download the ZIP.git clone git clone https://github.com/Krishnapriya462/browser-notepad.git
-2. cd browser-notepad
+1. **Download the Extension:**  
+   Download the Extension:Clone this repository or download the ZIP.git clone git clone https://github.com/Krishnapriya462/simpleExcel.git
+2. cd simpleExcel
 3. Load as an Unpacked Extension:
 4. Open Chrome and go to chrome://extensions/
-5.  Developer mode (top right corner)
+5. Enable Developer mode (top right corner)
 6. Click "Load unpacked" and select the folder
 
 ### 4. Use the Extension
