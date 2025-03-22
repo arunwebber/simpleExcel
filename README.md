@@ -30,7 +30,7 @@ Ensure the following files are present in the project directory:
 To install the extension in Chrome, follow these steps:
 
 1. **Download the Extension:**  
-   Download the Extension:Clone this repository or download the ZIP.git clone git clone https://github.com/Krishnapriya462/simpleExcel.git
+   Clone this repository 
 2. cd simpleExcel
 3. Load as an Unpacked Extension:
 4. Open Chrome and go to chrome://extensions/
