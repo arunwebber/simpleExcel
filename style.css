@@ -59,7 +59,7 @@ table {
 /* Styling for table header and cells */
 td, th {
   border: 1px solid #ddd;
-  width: 100px;
+  width: 100px; /* Use a default width instead of min-width */
   height: 30px;
   text-align: center;
   position: relative;
