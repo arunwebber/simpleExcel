@@ -1,12 +1,12 @@
 class StorageManager {
   // Save data to localStorage
   static saveToLocalStorage(key, value) {
-      localStorage.setItem(key, value);
+    localStorage.setItem(key, value);
   }
 
   // Retrieve data from localStorage
   static getFromLocalStorage(key, defaultValue = '') {
-      return localStorage.getItem(key) || defaultValue;
+    return localStorage.getItem(key) || defaultValue;
   }
 }
 
@@ -16,14 +16,8 @@ class InputManager {
   }
 
   handleCellInput(event) {
-    const input = event.target;
-    const td = input.parentElement;
-    const row = td.parentElement;
-    const col = Array.from(row.children).indexOf(td) - 1; // Index of column in the row
-    const rowIndex = Array.from(this.spreadsheet.table.children).indexOf(row) - 1; // Index of row in the table
-
-    // Save the current input state in the history
-    this.spreadsheet.saveState();
+    // This method is now simplified as saving is handled by a single event listener on the table.
+    // It's still useful for a single point of interaction if more logic is needed.
   }
 }
 
@@ -84,12 +78,12 @@ class LintingManager {
 
   highlightRowAndColumn(row, col) {
     // Highlight the row header
-    const rowHeader = this.spreadsheet.table.querySelectorAll("tr")[row + 1].querySelector("th");
-    rowHeader.classList.add("highlight-row");
+    const rowHeader = this.spreadsheet.table.querySelectorAll("tr")[row + 1]?.querySelector("th");
+    if (rowHeader) rowHeader.classList.add("highlight-row");
 
     // Highlight the column header
     const headerCells = this.spreadsheet.table.querySelectorAll("tr:first-child th");
-    headerCells[col + 1].classList.add("highlight-col");
+    if (headerCells[col + 1]) headerCells[col + 1].classList.add("highlight-col");
   }
 
   clearHighlighting() {
@@ -114,17 +108,40 @@ class ContextMenuManager {
       this.showContextMenu(event);
     });
 
-    // New Event Listeners for Delete Buttons
-    document.getElementById("deleteRowBtn").addEventListener("click", () => {
-        if (this.selectedRow !== null) {
-            this.spreadsheet.tableManager.deleteElement(true, this.selectedRow);
-        }
+    // Add Row Above/Below
+    document.getElementById("addRowAboveBtn")?.addEventListener("click", () => {
+      if (this.selectedRow !== null) {
+        this.spreadsheet.tableManager.addElement(true, 'above');
+      }
+    });
+    document.getElementById("addRowBelowBtn")?.addEventListener("click", () => {
+      if (this.selectedRow !== null) {
+        this.spreadsheet.tableManager.addElement(true, 'below');
+      }
     });
 
-    document.getElementById("deleteColBtn").addEventListener("click", () => {
-        if (this.selectedCol !== null) {
-            this.spreadsheet.tableManager.deleteElement(false, this.selectedCol);
-        }
+    // Add Column Left/Right
+    document.getElementById("addColLeftBtn")?.addEventListener("click", () => {
+      if (this.selectedCol !== null) {
+        this.spreadsheet.tableManager.addElement(false, 'left');
+      }
+    });
+    document.getElementById("addColRightBtn")?.addEventListener("click", () => {
+      if (this.selectedCol !== null) {
+        this.spreadsheet.tableManager.addElement(false, 'right');
+      }
+    });
+
+    document.getElementById("deleteRowBtn")?.addEventListener("click", () => {
+      if (this.selectedRow !== null) {
+        this.spreadsheet.tableManager.deleteElement(true, this.selectedRow);
+      }
+    });
+
+    document.getElementById("deleteColBtn")?.addEventListener("click", () => {
+      if (this.selectedCol !== null) {
+        this.spreadsheet.tableManager.deleteElement(false, this.selectedCol);
+      }
     });
 
     document.addEventListener("click", () => this.contextMenu.style.display = 'none');
@@ -135,11 +152,13 @@ class ContextMenuManager {
 
     if (cell.tagName === 'TH') {
       const isColumnHeader = cell.parentElement === this.spreadsheet.table.querySelector("tr:first-child");
-      
+
       // Updated logic to show/hide all buttons
-      document.getElementById("addRowBtn").style.display = isColumnHeader ? 'none' : 'block';
+      document.getElementById("addRowAboveBtn").style.display = isColumnHeader ? 'none' : 'block';
+      document.getElementById("addRowBelowBtn").style.display = isColumnHeader ? 'none' : 'block';
       document.getElementById("deleteRowBtn").style.display = isColumnHeader ? 'none' : 'block';
-      document.getElementById("addColBtn").style.display = isColumnHeader ? 'block' : 'none';
+      document.getElementById("addColLeftBtn").style.display = isColumnHeader ? 'block' : 'none';
+      document.getElementById("addColRightBtn").style.display = isColumnHeader ? 'block' : 'none';
       document.getElementById("deleteColBtn").style.display = isColumnHeader ? 'block' : 'none';
 
       this.contextMenu.style.display = 'block';
@@ -203,9 +222,9 @@ class TableManager {
     const startSize = dimension === "width" ? td.offsetWidth : td.offsetHeight;
 
     const onMouseMove = (e) => {
-      const newSize = dimension === "width"
-        ? startSize + (e.clientX - start)
-        : startSize + (e.clientY - start);
+      const newSize = dimension === "width" ?
+        startSize + (e.clientX - start) :
+        startSize + (e.clientY - start);
 
       if (dimension === "width") {
         td.style.width = `${newSize}px`;
@@ -254,70 +273,86 @@ class TableManager {
     }
   }
 
-  addElement(isRow) {
+  addElement(isRow, position = 'below') {
     if (isRow) {
-      const tr = this.createTableRow(this.spreadsheet.numRows);
-      this.table.appendChild(tr);
-      this.spreadsheet.numRows++;
-    } else {
-      this.spreadsheet.numCols++;
-      const headerRow = this.table.querySelector("tr:first-child");
-      const th = document.createElement("th");
-      th.textContent = this.spreadsheet.getColumnName(this.spreadsheet.numCols);
-      headerRow.appendChild(th);
+      const index = (position === 'above' && this.spreadsheet.contextMenuManager.selectedRow !== null) ?
+        this.spreadsheet.contextMenuManager.selectedRow :
+        this.spreadsheet.contextMenuManager.selectedRow + 1;
 
-      const rows = this.table.querySelectorAll("tr");
-      for (let i = 1; i < rows.length; i++) {
-        const td = this.createDataCell();
-        rows[i].appendChild(td);
+      const newRow = this.createTableRow(this.spreadsheet.numRows);
+
+      const referenceRow = this.table.rows[index];
+      if (referenceRow) {
+        this.table.insertBefore(newRow, referenceRow);
+      } else {
+        this.table.appendChild(newRow);
       }
+
+      this.spreadsheet.numRows++;
+      this.updateRowHeaders();
+    } else {
+      const index = (position === 'left' && this.spreadsheet.contextMenuManager.selectedCol !== null) ?
+        this.spreadsheet.contextMenuManager.selectedCol :
+        this.spreadsheet.contextMenuManager.selectedCol + 1;
+
+      const rows = this.table.querySelectorAll('tr');
+      rows.forEach((row, rowIndex) => {
+        if (rowIndex === 0) {
+          const th = document.createElement('th');
+          th.textContent = this.spreadsheet.getColumnName(this.spreadsheet.numCols + 1);
+          row.insertBefore(th, row.cells[index]);
+        } else {
+          const td = this.createDataCell();
+          td.addEventListener("click", () => {
+            this.spreadsheet.lintingManager.clearHighlighting();
+            this.spreadsheet.lintingManager.highlightRowAndColumn(rowIndex - 1, index - 1);
+          });
+          row.insertBefore(td, row.cells[index]);
+        }
+      });
+      this.spreadsheet.numCols++;
+      this.updateColumnHeaders();
     }
     this.spreadsheet.contextMenuManager.contextMenu.style.display = 'none';
     this.spreadsheet.saveState();
   }
 
-  // --- NEW: Method to delete a row or column ---
   deleteElement(isRow, index) {
-      if (isRow) {
-          // Prevent deleting all rows
-          if (this.spreadsheet.numRows <= 1) return;
-          this.table.deleteRow(index);
-          this.spreadsheet.numRows--;
-          this.updateRowHeaders();
-      } else {
-          // Prevent deleting all columns
-          if (this.spreadsheet.numCols <= 1) return;
-          const rows = this.table.querySelectorAll("tr");
-          rows.forEach(row => {
-              row.deleteCell(index);
-          });
-          this.spreadsheet.numCols--;
-          this.updateColumnHeaders();
-      }
-      this.spreadsheet.contextMenuManager.contextMenu.style.display = 'none';
-      this.spreadsheet.saveState(); // Save state after deletion
-  }
-
-  // --- NEW: Helper to re-number row headers after deletion ---
-  updateRowHeaders() {
+    if (isRow) {
+      if (this.spreadsheet.numRows <= 1) return;
+      this.table.deleteRow(index);
+      this.spreadsheet.numRows--;
+      this.updateRowHeaders();
+    } else {
+      if (this.spreadsheet.numCols <= 1) return;
       const rows = this.table.querySelectorAll("tr");
-      // Start from 1 to skip the column header row
-      for (let i = 1; i < rows.length; i++) {
-          const rowHeader = rows[i].querySelector("th");
-          if (rowHeader) {
-              rowHeader.textContent = i;
-          }
-      }
+      rows.forEach(row => {
+        row.deleteCell(index);
+      });
+      this.spreadsheet.numCols--;
+      this.updateColumnHeaders();
+    }
+    this.spreadsheet.contextMenuManager.contextMenu.style.display = 'none';
+    this.spreadsheet.saveState();
   }
 
-  // --- NEW: Helper to re-letter column headers after deletion ---
-  updateColumnHeaders() {
-      const headerRow = this.table.querySelector("tr:first-child");
-      const headers = headerRow.querySelectorAll("th");
-      // Start from 1 to skip the empty top-left corner
-      for (let i = 1; i < headers.length; i++) {
-          headers[i].textContent = this.spreadsheet.getColumnName(i);
+  updateRowHeaders() {
+    const rows = this.table.querySelectorAll("tr");
+    for (let i = 1; i < rows.length; i++) {
+      const rowHeader = rows[i].querySelector("th");
+      if (rowHeader) {
+        rowHeader.textContent = i;
       }
+    }
+  }
+
+  updateColumnHeaders() {
+    const headerRow = this.table.querySelector("tr:first-child");
+    const headers = headerRow.querySelectorAll("th");
+
+    for (let i = 1; i < headers.length; i++) {
+        headers[i].textContent = this.spreadsheet.getColumnName(i);
+    }
   }
 
   clearTable() {
@@ -341,7 +376,7 @@ class Spreadsheet {
     this.contextMenuManager = new ContextMenuManager(this);
     this.tableManager = new TableManager(this);
 
-    this.tableManager.createTable();
+    // Load data first, then create the table.
     this.loadFromLocalStorage();
     this.addEventListeners();
   }
@@ -376,20 +411,24 @@ class Spreadsheet {
     this.saveToLocalStorage(currentState);
   }
 
-  undo() { this.keyboardShortcutManager.undo(); }
+  undo() {
+    this.keyboardShortcutManager.undo();
+  }
 
-  redo() { this.keyboardShortcutManager.redo(); }
+  redo() {
+    this.keyboardShortcutManager.redo();
+  }
 
   loadState(state) {
     const rows = this.table.querySelectorAll('tr');
     for (let i = 1; i < rows.length; i++) {
-        const cells = rows[i].querySelectorAll('td input');
-        if (state && state[i-1]) {
-            cells.forEach((cell, colIndex) => {
-                const savedValue = state[i-1][colIndex];
-                cell.value = savedValue || ''; 
-            });
-        }
+      const cells = rows[i].querySelectorAll('td input');
+      if (state && state[i - 1]) {
+        cells.forEach((cell, colIndex) => {
+          const savedValue = state[i - 1][colIndex];
+          cell.value = savedValue || '';
+        });
+      }
     }
   }
 
@@ -408,7 +447,6 @@ class Spreadsheet {
     this.table.addEventListener("input", () => this.saveState());
   }
 
-  // 🔹 Save both table structure & cell data
   saveToLocalStorage(state) {
     const saveObj = {
       numRows: this.numRows,
@@ -418,18 +456,18 @@ class Spreadsheet {
     localStorage.setItem('spreadsheetData', JSON.stringify(saveObj));
   }
 
-  // 🔹 Load both table structure & cell data
   loadFromLocalStorage() {
     const saved = JSON.parse(localStorage.getItem('spreadsheetData'));
     if (saved) {
       this.numRows = saved.numRows || this.numRows;
       this.numCols = saved.numCols || this.numCols;
-      this.tableManager.createTable(); // rebuild table with saved structure
-      this.loadState(saved.data); // load saved cell values
+      this.tableManager.createTable();
+      this.loadState(saved.data);
+    } else {
+      this.tableManager.createTable();
     }
   }
 }
-
 
 // Create a new spreadsheet
 const spreadsheet = new Spreadsheet();
