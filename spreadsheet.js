@@ -419,11 +419,12 @@ class SheetManager {
     };
     this.createTab(name);
     this.switchSheet(name);
+    this.spreadsheet.saveToLocalStorage();
   }
 
   createTab(name) {
     const tab = document.createElement('div');
-    tab.className = 'tab'; // Changed from sheet-tab
+    tab.className = 'tab';
     tab.dataset.sheetName = name;
 
     const titleSpan = document.createElement('span');
@@ -431,7 +432,7 @@ class SheetManager {
     titleSpan.textContent = name;
     
     const closeBtn = document.createElement('span');
-    closeBtn.className = 'close-btn'; // Changed from close-tab
+    closeBtn.className = 'close-btn';
     closeBtn.textContent = 'x';
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -450,13 +451,22 @@ class SheetManager {
       alert("Cannot delete the last sheet.");
       return;
     }
+
+    const sheetNames = Object.keys(this.sheets);
+    const deletedIndex = sheetNames.indexOf(name);
+    
     delete this.sheets[name];
     const tabToDelete = this.tabContainer.querySelector(`[data-sheet-name="${name}"]`);
     if (tabToDelete) {
       tabToDelete.remove();
     }
-    const sheetNames = Object.keys(this.sheets);
-    this.switchSheet(sheetNames[0]);
+
+    // Determine the next sheet to activate
+    const newActiveSheetNames = Object.keys(this.sheets);
+    const newActiveSheetIndex = (deletedIndex === sheetNames.length - 1) ? deletedIndex - 1 : deletedIndex;
+    this.switchSheet(newActiveSheetNames[newActiveSheetIndex]);
+    
+    this.spreadsheet.saveToLocalStorage(); // This is the crucial line to persist the deletion
   }
 
   switchSheet(name) {
@@ -466,19 +476,21 @@ class SheetManager {
     }
 
     this.activeSheetName = name;
-    this.spreadsheet.numRows = this.sheets[name].numRows;
-    this.spreadsheet.numCols = this.sheets[name].numCols;
+    if (this.sheets[name]) {
+        this.spreadsheet.numRows = this.sheets[name].numRows;
+        this.spreadsheet.numCols = this.sheets[name].numCols;
 
-    this.spreadsheet.tableManager.createTable();
-    this.spreadsheet.tableManager.loadData(this.sheets[name].data);
-    this.spreadsheet.applyColumnWidths(this.sheets[name].columnWidths);
+        this.spreadsheet.tableManager.createTable();
+        this.spreadsheet.tableManager.loadData(this.sheets[name].data);
+        this.spreadsheet.applyColumnWidths(this.sheets[name].columnWidths);
+    }
     
     this.tabContainer.querySelector(`[data-sheet-name="${name}"]`)?.classList.add('active');
     this.spreadsheet.saveToLocalStorage();
   }
 
   saveActiveSheetState() {
-    if (!this.activeSheetName) return;
+    if (!this.activeSheetName || !this.sheets[this.activeSheetName]) return;
     this.sheets[this.activeSheetName].numRows = this.spreadsheet.numRows;
     this.sheets[this.activeSheetName].numCols = this.spreadsheet.numCols;
     this.sheets[this.activeSheetName].data = this.spreadsheet.tableManager.getCurrentData();
@@ -498,6 +510,53 @@ class SheetManager {
   }
 }
 
+class DownloadPrintManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+  }
+
+  downloadAsCSV() {
+    let csv = [];
+    const rows = this.spreadsheet.table.querySelectorAll("tr");
+    
+    for (let i = 0; i < rows.length; i++) {
+        let row = [], cols = rows[i].querySelectorAll("td, th");
+        for (let j = 0; j < cols.length; j++) {
+            let cellValue = "";
+            if (cols[j].tagName === "TD") {
+                cellValue = cols[j].querySelector("input").value;
+            } else if (cols[j].tagName === "TH") {
+                cellValue = cols[j].innerText;
+            }
+            row.push(cellValue);
+        }
+        csv.push(row.join(","));
+    }
+
+    const csvFile = new Blob([csv.join("\n")], { type: "text/csv" });
+    const downloadLink = document.createElement("a");
+    downloadLink.download = "spreadsheet.csv";
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+  }
+
+  printTable() {
+    const tableToPrint = this.spreadsheet.table.outerHTML;
+    const printWindow = window.open('', '', 'height=600,width=800');
+    printWindow.document.write('<html><head><title>Print Spreadsheet</title>');
+    printWindow.document.write('<style>table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid black; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(tableToPrint);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+}
+
 class Spreadsheet {
   constructor(numRows = 25, numCols = 25) {
     this.numRows = numRows;
@@ -509,6 +568,7 @@ class Spreadsheet {
     this.contextMenuManager = new ContextMenuManager(this);
     this.tableManager = new TableManager(this);
     this.sheetManager = new SheetManager(this);
+    this.downloadPrintManager = new DownloadPrintManager(this);
 
     this.loadFromLocalStorage();
     this.addEventListeners();
@@ -529,6 +589,14 @@ class Spreadsheet {
       this.tableManager.clearTable();
     });
 
+    document.getElementById("downloadBtn")?.addEventListener("click", () => {
+      this.downloadPrintManager.downloadAsCSV();
+    });
+
+    document.getElementById("printBtn")?.addEventListener("click", () => {
+      this.downloadPrintManager.printTable();
+    });
+
     document.addEventListener("keydown", (e) => this.stateManager.handleKeyboardShortcuts(e));
 
     const darkModeToggle = document.getElementById("darkModeToggle");
@@ -542,7 +610,7 @@ class Spreadsheet {
       }
     });
   }
-
+  
   loadDarkModePreference() {
     const darkModeEnabled = localStorage.getItem("darkMode") === "enabled";
     const darkModeToggle = document.getElementById("darkModeToggle");
