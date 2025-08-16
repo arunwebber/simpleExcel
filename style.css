@@ -73,6 +73,37 @@ body.dark-mode #title {
   background-color: #0056b3;
 }
 
+/* New styles for all the spreadsheet buttons that change based on dark mode */
+#clearBtn,
+#downloadBtn,
+#printBtn {
+  cursor: pointer;
+  touch-action: manipulation;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 16px;
+  border: 1px solid var(--primary-color);
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+}
+
+body.dark-mode #clearBtn,
+body.dark-mode #downloadBtn,
+body.dark-mode #printBtn {
+  background-color: var(--element-bg-dark);
+  border-color: var(--border-dark);
+  color: var(--text-dark);
+}
+
+body.dark-mode #clearBtn:hover,
+body.dark-mode #downloadBtn:hover,
+body.dark-mode #printBtn:hover {
+  background-color: #3e3e40;
+}
+
 /* --- Main Layout --- */
 .container {
   display: flex;
@@ -251,7 +282,6 @@ body.dark-mode #footer {
 #actionButtons {
     display: flex;
     gap: 10px;
-    /* Increased margin to add more space on the right */
     margin-right: 40px; 
 }
 
@@ -270,6 +300,7 @@ body.dark-mode #footer {
 #printBtn:hover {
   background-color: #0056b3;
 }
+
 /* --- Tab Bar --- */
 #tab-bar {
   display: flex;
