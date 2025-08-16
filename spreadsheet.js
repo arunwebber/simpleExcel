@@ -400,11 +400,11 @@ class SheetManager {
     this.sheets = {};
     this.activeSheetName = null;
     this.sheetCount = 0;
-    this.sheetTabsContainer = document.getElementById('sheetTabs');
-    this.addSheetButton = document.getElementById('addSheetBtn');
+    this.tabContainer = document.getElementById('tabContainer');
+    this.addTabButton = document.getElementById('addTabBtn');
 
-    if (this.addSheetButton) {
-      this.addSheetButton.addEventListener('click', () => this.addSheet());
+    if (this.addTabButton) {
+      this.addTabButton.addEventListener('click', () => this.addSheet());
     }
   }
 
@@ -423,22 +423,25 @@ class SheetManager {
 
   createTab(name) {
     const tab = document.createElement('div');
-    tab.className = 'sheet-tab';
-    tab.textContent = name;
+    tab.className = 'tab'; // Changed from sheet-tab
     tab.dataset.sheetName = name;
 
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'tab-title';
+    titleSpan.textContent = name;
+    
     const closeBtn = document.createElement('span');
-    closeBtn.className = 'close-tab';
+    closeBtn.className = 'close-btn'; // Changed from close-tab
     closeBtn.textContent = 'x';
     closeBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.deleteSheet(name);
     });
 
+    tab.appendChild(titleSpan);
     tab.appendChild(closeBtn);
     
-    // Always insert the tab before the add button
-    this.sheetTabsContainer.insertBefore(tab, this.addSheetButton);
+    this.tabContainer.insertBefore(tab, this.addTabButton);
     tab.addEventListener('click', () => this.switchSheet(name));
   }
 
@@ -448,7 +451,7 @@ class SheetManager {
       return;
     }
     delete this.sheets[name];
-    const tabToDelete = this.sheetTabsContainer.querySelector(`[data-sheet-name="${name}"]`);
+    const tabToDelete = this.tabContainer.querySelector(`[data-sheet-name="${name}"]`);
     if (tabToDelete) {
       tabToDelete.remove();
     }
@@ -459,7 +462,7 @@ class SheetManager {
   switchSheet(name) {
     if (this.activeSheetName) {
       this.saveActiveSheetState();
-      this.sheetTabsContainer.querySelector(`[data-sheet-name="${this.activeSheetName}"]`)?.classList.remove('active');
+      this.tabContainer.querySelector(`[data-sheet-name="${this.activeSheetName}"]`)?.classList.remove('active');
     }
 
     this.activeSheetName = name;
@@ -470,7 +473,7 @@ class SheetManager {
     this.spreadsheet.tableManager.loadData(this.sheets[name].data);
     this.spreadsheet.applyColumnWidths(this.sheets[name].columnWidths);
     
-    this.sheetTabsContainer.querySelector(`[data-sheet-name="${name}"]`)?.classList.add('active');
+    this.tabContainer.querySelector(`[data-sheet-name="${name}"]`)?.classList.add('active');
     this.spreadsheet.saveToLocalStorage();
   }
 
@@ -486,14 +489,10 @@ class SheetManager {
     this.sheets = sheetsData;
     this.sheetCount = Object.keys(sheetsData).length;
 
-    // Clear existing tabs, but keep the add button
-    const tabs = this.sheetTabsContainer.querySelectorAll('.sheet-tab');
+    const tabs = this.tabContainer.querySelectorAll('.tab');
     tabs.forEach(tab => tab.remove());
     
-    // Create tabs for loaded sheets
     Object.keys(this.sheets).forEach(name => this.createTab(name));
-    
-    // The add button remains in the DOM and is not touched here
     
     this.switchSheet(activeSheet);
   }
