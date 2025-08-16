@@ -26,32 +26,33 @@ class StateManager {
   }
 
   saveState() {
-    const currentState = this.spreadsheet.tableManager.getCurrentData();
-    const lastState = this.history[this.historyIndex];
+    // History is now tied to the active sheet
+    const currentSheetData = this.spreadsheet.tableManager.getCurrentData();
+    const currentSheetName = this.spreadsheet.sheetManager.activeSheetName;
+    
+    // Save state for the specific sheet
+    if (!this.history[this.historyIndex] || JSON.stringify(currentSheetData) !== JSON.stringify(this.history[this.historyIndex].data)) {
+        if (this.historyIndex < this.history.length - 1) {
+            this.history = this.history.slice(0, this.historyIndex + 1);
+        }
 
-    if (JSON.stringify(currentState) === JSON.stringify(lastState)) {
-      return;
+        this.history.push({ sheet: currentSheetName, data: currentSheetData });
+        this.historyIndex++;
+        
+        if (this.history.length > 50) {
+            this.history.shift();
+            this.historyIndex--;
+        }
     }
-
-    if (this.historyIndex < this.history.length - 1) {
-      this.history = this.history.slice(0, this.historyIndex + 1);
-    }
-
-    this.history.push(currentState);
-    this.historyIndex++;
-
-    if (this.history.length > 50) {
-      this.history.shift();
-      this.historyIndex--;
-    }
-
     this.spreadsheet.saveToLocalStorage();
   }
 
   undo() {
     if (this.historyIndex > 0) {
       this.historyIndex--;
-      this.spreadsheet.tableManager.loadData(this.history[this.historyIndex]);
+      const prevState = this.history[this.historyIndex];
+      this.spreadsheet.sheetManager.switchSheet(prevState.sheet);
+      this.spreadsheet.tableManager.loadData(prevState.data);
       this.spreadsheet.saveToLocalStorage();
     }
   }
@@ -59,7 +60,9 @@ class StateManager {
   redo() {
     if (this.historyIndex < this.history.length - 1) {
       this.historyIndex++;
-      this.spreadsheet.tableManager.loadData(this.history[this.historyIndex]);
+      const nextState = this.history[this.historyIndex];
+      this.spreadsheet.sheetManager.switchSheet(nextState.sheet);
+      this.spreadsheet.tableManager.loadData(nextState.data);
       this.spreadsheet.saveToLocalStorage();
     }
   }
@@ -353,7 +356,6 @@ class TableManager {
     this.spreadsheet.saveToLocalStorage(); // ensure cleared state is saved
   }
 
-
   getCurrentData() {
     const data = [];
     const rows = this.table.querySelectorAll('tr');
@@ -392,6 +394,110 @@ class TableManager {
   }
 }
 
+class SheetManager {
+  constructor(spreadsheet) {
+    this.spreadsheet = spreadsheet;
+    this.sheets = {};
+    this.activeSheetName = null;
+    this.sheetCount = 0;
+    this.sheetTabsContainer = document.getElementById('sheetTabs');
+    this.addSheetButton = document.getElementById('addSheetBtn');
+
+    if (this.addSheetButton) {
+      this.addSheetButton.addEventListener('click', () => this.addSheet());
+    }
+  }
+
+  addSheet(sheetName = null) {
+    this.sheetCount++;
+    const name = sheetName || `Sheet ${this.sheetCount}`;
+    this.sheets[name] = {
+      numRows: 25,
+      numCols: 25,
+      data: [],
+      columnWidths: []
+    };
+    this.createTab(name);
+    this.switchSheet(name);
+  }
+
+  createTab(name) {
+    const tab = document.createElement('div');
+    tab.className = 'sheet-tab';
+    tab.textContent = name;
+    tab.dataset.sheetName = name;
+
+    const closeBtn = document.createElement('span');
+    closeBtn.className = 'close-tab';
+    closeBtn.textContent = 'x';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.deleteSheet(name);
+    });
+
+    tab.appendChild(closeBtn);
+    
+    // Always insert the tab before the add button
+    this.sheetTabsContainer.insertBefore(tab, this.addSheetButton);
+    tab.addEventListener('click', () => this.switchSheet(name));
+  }
+
+  deleteSheet(name) {
+    if (Object.keys(this.sheets).length <= 1) {
+      alert("Cannot delete the last sheet.");
+      return;
+    }
+    delete this.sheets[name];
+    const tabToDelete = this.sheetTabsContainer.querySelector(`[data-sheet-name="${name}"]`);
+    if (tabToDelete) {
+      tabToDelete.remove();
+    }
+    const sheetNames = Object.keys(this.sheets);
+    this.switchSheet(sheetNames[0]);
+  }
+
+  switchSheet(name) {
+    if (this.activeSheetName) {
+      this.saveActiveSheetState();
+      this.sheetTabsContainer.querySelector(`[data-sheet-name="${this.activeSheetName}"]`)?.classList.remove('active');
+    }
+
+    this.activeSheetName = name;
+    this.spreadsheet.numRows = this.sheets[name].numRows;
+    this.spreadsheet.numCols = this.sheets[name].numCols;
+
+    this.spreadsheet.tableManager.createTable();
+    this.spreadsheet.tableManager.loadData(this.sheets[name].data);
+    this.spreadsheet.applyColumnWidths(this.sheets[name].columnWidths);
+    
+    this.sheetTabsContainer.querySelector(`[data-sheet-name="${name}"]`)?.classList.add('active');
+    this.spreadsheet.saveToLocalStorage();
+  }
+
+  saveActiveSheetState() {
+    if (!this.activeSheetName) return;
+    this.sheets[this.activeSheetName].numRows = this.spreadsheet.numRows;
+    this.sheets[this.activeSheetName].numCols = this.spreadsheet.numCols;
+    this.sheets[this.activeSheetName].data = this.spreadsheet.tableManager.getCurrentData();
+    this.sheets[this.activeSheetName].columnWidths = this.spreadsheet.getColumnWidths();
+  }
+
+  loadSheets(sheetsData, activeSheet) {
+    this.sheets = sheetsData;
+    this.sheetCount = Object.keys(sheetsData).length;
+
+    // Clear existing tabs, but keep the add button
+    const tabs = this.sheetTabsContainer.querySelectorAll('.sheet-tab');
+    tabs.forEach(tab => tab.remove());
+    
+    // Create tabs for loaded sheets
+    Object.keys(this.sheets).forEach(name => this.createTab(name));
+    
+    // The add button remains in the DOM and is not touched here
+    
+    this.switchSheet(activeSheet);
+  }
+}
 
 class Spreadsheet {
   constructor(numRows = 25, numCols = 25) {
@@ -403,6 +509,7 @@ class Spreadsheet {
     this.lintingManager = new LintingManager(this);
     this.contextMenuManager = new ContextMenuManager(this);
     this.tableManager = new TableManager(this);
+    this.sheetManager = new SheetManager(this);
 
     this.loadFromLocalStorage();
     this.addEventListeners();
@@ -450,48 +557,52 @@ class Spreadsheet {
   }
 
   saveToLocalStorage() {
-    // Capture column widths
-    const columnWidths = [];
-    const headerCells = this.table.querySelector("tr:first-child").querySelectorAll("th");
-    headerCells.forEach((th, i) => {
-      if (i > 0) columnWidths.push(th.style.width || null);
-    });
-
+    this.sheetManager.saveActiveSheetState();
     const saveObj = {
-      numRows: this.numRows,
-      numCols: this.numCols,
-      data: this.tableManager.getCurrentData(),
-      columnWidths: columnWidths
+      sheets: this.sheetManager.sheets,
+      activeSheet: this.sheetManager.activeSheetName,
+      history: this.stateManager.history,
+      historyIndex: this.stateManager.historyIndex
     };
     StorageManager.saveToLocalStorage('spreadsheetData', saveObj);
   }
 
   loadFromLocalStorage() {
     const saved = StorageManager.getFromLocalStorage('spreadsheetData');
-    if (saved) {
-      this.numRows = saved.numRows;
-      this.numCols = saved.numCols;
-      this.tableManager.createTable();
-      this.tableManager.loadData(saved.data);
+    if (saved && saved.sheets && saved.activeSheet) {
+      this.stateManager.history = saved.history || [];
+      this.stateManager.historyIndex = saved.historyIndex || -1;
+      this.sheetManager.loadSheets(saved.sheets, saved.activeSheet);
+    } else {
+      this.sheetManager.addSheet();
+      this.stateManager.saveState();
+    }
+  }
 
-      // Apply saved column widths
-      if (saved.columnWidths) {
-        const headerCells = this.table.querySelector("tr:first-child").querySelectorAll("th");
-        saved.columnWidths.forEach((w, i) => {
-          if (w) {
+  applyColumnWidths(columnWidths) {
+    if (columnWidths) {
+      const headerCells = this.table.querySelector("tr:first-child")?.querySelectorAll("th");
+      columnWidths.forEach((w, i) => {
+        if (w) {
+          if (headerCells[i + 1]) {
             headerCells[i + 1].style.width = w;
             this.table.querySelectorAll(`tr td:nth-child(${i + 2})`)
               .forEach(td => td.style.width = w);
           }
-        });
-      }
-
-      this.stateManager.history.push(saved.data);
-      this.stateManager.historyIndex = 0;
-    } else {
-      this.tableManager.createTable();
-      this.stateManager.saveState();
+        }
+      });
     }
+  }
+
+  getColumnWidths() {
+    const columnWidths = [];
+    const headerCells = this.table.querySelector("tr:first-child")?.querySelectorAll("th");
+    if (headerCells) {
+      headerCells.forEach((th, i) => {
+        if (i > 0) columnWidths.push(th.style.width || null);
+      });
+    }
+    return columnWidths;
   }
 }
 
