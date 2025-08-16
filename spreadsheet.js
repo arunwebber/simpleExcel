@@ -444,6 +444,90 @@ class SheetManager {
     
     this.tabContainer.insertBefore(tab, this.addTabButton);
     tab.addEventListener('click', () => this.switchSheet(name));
+
+    // New Event Listener for double-click to rename
+    tab.addEventListener('dblclick', () => this.handleTabTitleDoubleClick(tab));
+  }
+
+  handleTabTitleDoubleClick(tab) {
+    const titleSpan = tab.querySelector('.tab-title');
+    const originalTitle = titleSpan.textContent;
+    
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = originalTitle;
+    input.className = 'edit-title'; 
+    input.style.width = `${titleSpan.offsetWidth}px`;
+
+    titleSpan.style.display = 'none';
+    tab.insertBefore(input, titleSpan);
+    
+    input.focus();
+    input.select();
+
+    const saveTitle = () => {
+        const newTitle = input.value.trim();
+        if (newTitle && newTitle !== originalTitle) {
+            this.updateSheetName(originalTitle, newTitle);
+        }
+        input.remove();
+        titleSpan.style.display = 'block';
+    };
+
+    input.addEventListener('blur', saveTitle);
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            saveTitle();
+        }
+    });
+  }
+
+  updateSheetName(oldName, newName) {
+      if (this.sheets[newName]) {
+          alert("A sheet with this name already exists. Please choose a different name.");
+          return;
+      }
+
+      // Preserve the order of sheets
+      const orderedSheets = Object.keys(this.sheets);
+      const newSheets = {};
+      
+      orderedSheets.forEach(sheetName => {
+          if (sheetName === oldName) {
+              newSheets[newName] = this.sheets[oldName];
+          } else {
+              newSheets[sheetName] = this.sheets[sheetName];
+          }
+      });
+      this.sheets = newSheets;
+
+      // Update active sheet name
+      if (this.activeSheetName === oldName) {
+          this.activeSheetName = newName;
+      }
+
+      // Update the history to reflect the new sheet name
+      this.spreadsheet.stateManager.history.forEach(state => {
+          if (state.sheet === oldName) {
+              state.sheet = newName;
+          }
+      });
+
+      // Update the tab element
+      const oldTab = this.tabContainer.querySelector(`[data-sheet-name="${oldName}"]`);
+      if (oldTab) {
+          oldTab.dataset.sheetName = newName;
+          oldTab.querySelector('.tab-title').textContent = newName;
+          // Re-add event listeners to the new tab name to avoid issues
+          oldTab.removeEventListener('click', this.switchSheet);
+          oldTab.addEventListener('click', () => this.switchSheet(newName));
+          oldTab.querySelector('.close-btn').removeEventListener('click', this.deleteSheet);
+          oldTab.querySelector('.close-btn').addEventListener('click', (e) => {
+              e.stopPropagation();
+              this.deleteSheet(newName);
+          });
+      }
+      this.spreadsheet.saveToLocalStorage();
   }
 
   deleteSheet(name) {
