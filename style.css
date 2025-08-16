@@ -217,10 +217,9 @@ body.dark-mode #contextMenu button:hover {
 
 /* --- Footer --- */
 #footer {
-  padding: 10px;
+  padding: 10px 20px;
   background-color: #f0f0f0;
   border-top: 1px solid #ddd;
-  text-align: center;
   font-size: 14px;
   color: #333;
   position: fixed;
@@ -229,12 +228,15 @@ body.dark-mode #contextMenu button:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
 }
 
 body.dark-mode #footer {
   background-color: #1e1e1e;
   border-top-color: #333;
   color: #f0f0f0;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2);
 }
 
 #footer a {
@@ -249,6 +251,8 @@ body.dark-mode #footer {
 #actionButtons {
     display: flex;
     gap: 10px;
+    /* Increased margin to add more space on the right */
+    margin-right: 40px; 
 }
 
 #downloadBtn,
@@ -266,7 +270,6 @@ body.dark-mode #footer {
 #printBtn:hover {
   background-color: #0056b3;
 }
-
 /* --- Tab Bar --- */
 #tab-bar {
   display: flex;
