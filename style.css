@@ -6,7 +6,7 @@ body {
   background-color: #f0f0f0;
   display: flex;
   flex-direction: column;
-  height: 100vh;  /* Full viewport height */
+  height: 100vh;
 }
 
 /* Header styling */
@@ -37,9 +37,9 @@ body {
 /* Main container styling */
 .container {
   display: flex;
-  flex: 1;  /* Ensures the container fills remaining space */
-  overflow: auto;  /* Enables scrolling */
-  max-height: calc(100vh - 100px); /* Adjust the height based on header and footer height */
+  flex: 1;
+  overflow: auto;
+  max-height: calc(100vh - 100px);
   width: 100%;
   border: 1px solid #ccc;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
@@ -51,7 +51,7 @@ body {
 /* Table styling */
 table {
   border-collapse: collapse;
-  min-width: 600px; /* Ensures the table is wide enough to trigger horizontal scrolling if needed */
+  min-width: 600px;
   width: 100%;
 }
 
@@ -110,7 +110,7 @@ td input {
   background-color: #e0e0e0;
 }
 
-/* Button styling */
+/* General button styling */
 button {
   padding: 10px;
   background-color: #007bff;
@@ -118,32 +118,41 @@ button {
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  width: 100%; /* Make the buttons span the full width of their container */
-  box-sizing: border-box; /* Ensures padding doesn't affect width */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 button:hover {
   background-color: #0056b3;
 }
 
+/* --- Start of the fix --- */
+
 /* Right-click menu styling */
+#contextMenu {
+  z-index: 1000;
+  padding: 5px; /* Add some padding for spacing */
+  background: #fff;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
 #contextMenu button {
   padding: 8px 12px;
-  background-color: #f0f0f0;
+  background-color: #f8f8f8; /* A light, clean background */
   border: none;
   text-align: left;
   width: 100%;
   cursor: pointer;
   font-size: 14px;
+  color: #333; /* Dark text for readability */
 }
 
 #contextMenu button:hover {
-  background-color: #e0e0e0;
+  background-color: #e0e0e0; /* A slightly darker gray on hover */
 }
 
-#contextMenu {
-  z-index: 1000;  /* Ensure the context menu appears above other elements */
-}
+/* --- End of the fix --- */
 
 #title {
   font-size: 18px;
