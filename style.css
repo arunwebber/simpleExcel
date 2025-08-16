@@ -1,82 +1,173 @@
-/* Reset body styles */
-body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;  /* Full viewport height */
+/* --- Global Styles and Typography --- */
+:root {
+  --primary-color: #007bff;
+  --secondary-color: #28a745;
+  --bg-light: #f9f9fb;
+  --text-light: #333;
+  --border-light: #e0e0e0;
+
+  --bg-dark: #1f2022;
+  --text-dark: #f0f0f0;
+  --border-dark: #3a3b3d;
+  --element-bg-dark: #2c2d2e;
 }
 
-/* Header styling */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-light);
+  color: var(--text-light);
+  transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark-mode {
+  background-color: var(--bg-dark);
+  color: var(--text-dark);
+}
+
+/* --- Header & Controls --- */
 #header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 12px 20px;
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+body.dark-mode #header {
+  background-color: var(--element-bg-dark);
+  border-bottom-color: var(--border-dark);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#title {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-light);
+}
+
+body.dark-mode #title {
+  color: var(--text-dark);
+}
+
+/* General button styling */
+#clearBtn {
   padding: 10px;
-  background-color: #f0f0f0;
-  border-bottom: 1px solid #ddd;
-  width: 100%;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
   box-sizing: border-box;
 }
 
-/* Footer styling */
-#footer {
-  padding: 10px;
-  background-color: #f0f0f0;
-  border-top: 1px solid #ddd;
-  text-align: center;
-  font-size: 14px;
-  color: #333;
-  position: fixed;
-  bottom: 0;
-  width: 100%;
+#clearBtn:hover {
+  background-color: #0056b3;
 }
 
-/* Main container styling */
+/* New styles for all the spreadsheet buttons that change based on dark mode */
+#clearBtn,
+#downloadBtn,
+#printBtn {
+  cursor: pointer;
+  touch-action: manipulation;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 16px;
+  border: 1px solid var(--primary-color);
+  background-color: var(--primary-color);
+  color: white;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.1s;
+}
+
+body.dark-mode #clearBtn,
+body.dark-mode #downloadBtn,
+body.dark-mode #printBtn {
+  background-color: var(--element-bg-dark);
+  border-color: var(--border-dark);
+  color: var(--text-dark);
+}
+
+body.dark-mode #clearBtn:hover,
+body.dark-mode #downloadBtn:hover,
+body.dark-mode #printBtn:hover {
+  background-color: #3e3e40;
+}
+
+/* --- Main Layout --- */
 .container {
-  display: flex;
-  flex: 1;  /* Ensures the container fills remaining space */
-  overflow: auto;  /* Enables scrolling */
-  max-height: calc(100vh - 100px); /* Adjust the height based on header and footer height */
+  display: block;
+  flex: 1;
+  overflow: auto; 
   width: 100%;
   border: 1px solid #ccc;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   background-color: #fff;
   position: relative;
+  max-height: calc(100vh - 150px);
+}
+
+body.dark-mode .container {
+  background-color: var(--element-bg-dark);
+  border-color: var(--border-dark);
 }
 
 /* Table styling */
 table {
   border-collapse: collapse;
-  min-width: 600px; /* Ensures the table is wide enough to trigger horizontal scrolling if needed */
-  width: 100%;
+  /* Key changes below */
+  table-layout: fixed; /* This is crucial. It prevents columns from auto-resizing. */
+  width: auto;
+  min-width: 2000px; /* Set a large minimum width to force horizontal scrolling. */
 }
 
-/* Styling for table header and cells */
 td, th {
   border: 1px solid #ddd;
-  width: 100px;
+  width: 100px; /* Keep a consistent base width for cells */
   height: 30px;
   text-align: center;
   position: relative;
 }
 
-/* Styling for table headers */
 th {
   background-color: #f0f0f0;
   font-weight: bold;
 }
 
-/* Input fields inside cells */
+body.dark-mode th {
+    background-color: #2a2a2a;
+    color: #f0f0f0;
+    border-color: #444;
+}
+
+body.dark-mode td {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+    border-color: #444;
+}
+
 td input {
   border: none;
   width: 100%;
   height: 100%;
   text-align: center;
   box-sizing: border-box;
+  background-color: transparent;
+}
+
+body.dark-mode td input {
+  color: var(--text-dark);
 }
 
 /* Resizer for column resizing */
@@ -110,43 +201,290 @@ td input {
   background-color: #e0e0e0;
 }
 
-/* Button styling */
-button {
-  padding: 10px;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  width: 100%; /* Make the buttons span the full width of their container */
-  box-sizing: border-box; /* Ensures padding doesn't affect width */
+body.dark-mode .highlight-row {
+    background-color: #2a2a2a;
 }
 
-button:hover {
-  background-color: #0056b3;
+body.dark-mode .highlight-col {
+    background-color: #3a3a3a;
 }
 
 /* Right-click menu styling */
+#contextMenu {
+  z-index: 1000;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid #ddd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
 #contextMenu button {
   padding: 8px 12px;
-  background-color: #f0f0f0;
+  background-color: #f8f8f8;
   border: none;
   text-align: left;
   width: 100%;
   cursor: pointer;
   font-size: 14px;
+  color: #333;
 }
 
 #contextMenu button:hover {
   background-color: #e0e0e0;
 }
 
-#contextMenu {
-  z-index: 1000;  /* Ensure the context menu appears above other elements */
+body.dark-mode #contextMenu {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
 }
 
-#title {
-  font-size: 18px;
-  font-weight: bold;
+body.dark-mode #contextMenu button {
+    background-color: #2a2a2a;
+    color: #f0f0f0;
+}
+
+body.dark-mode #contextMenu button:hover {
+    background-color: #3a3a3a;
+}
+
+/* --- Footer --- */
+#footer {
+  padding: 10px 20px;
+  background-color: #f0f0f0;
+  border-top: 1px solid #ddd;
+  font-size: 14px;
   color: #333;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+
+body.dark-mode #footer {
+  background-color: #1e1e1e;
+  border-top-color: #333;
+  color: #f0f0f0;
+  box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#footer a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+#footer a:hover {
+  text-decoration: underline;
+}
+
+#actionButtons {
+    display: flex;
+    gap: 10px;
+    margin-right: 40px; 
+}
+
+#downloadBtn,
+#printBtn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+#downloadBtn:hover,
+#printBtn:hover {
+  background-color: #0056b3;
+}
+
+/* --- Tab Bar --- */
+#tab-bar {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  background-color: #eef1f4;
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+body.dark-mode #tab-bar {
+  background-color: #26272a;
+  border-bottom-color: var(--border-dark);
+}
+
+#tabContainer {
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#tabContainer::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  flex-shrink: 1;
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: #e0e0e0;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.tab:hover {
+  background-color: #d1d1d1;
+}
+
+body.dark-mode .tab {
+  background-color: #3e3e40;
+  color: var(--text-dark);
+}
+
+body.dark-mode .tab:hover {
+  background-color: #4c4d4f;
+}
+
+.tab.active {
+  background-color: var(--primary-color);
+  color: white;
+  font-weight: 500;
+  box-shadow: inset 0 -2px 0 var(--primary-color);
+}
+
+.tab.active .close-btn {
+  color: #ffffff;
+}
+
+.tab.active:hover {
+  background-color: #0069d9;
+}
+
+.tab .tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab .close-btn {
+  font-weight: bold;
+  color: #666;
+  cursor: pointer;
+  padding-left: 8px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.tab .close-btn:hover {
+  color: red;
+  opacity: 1;
+}
+
+body.dark-mode .tab .close-btn {
+  color: #ccc;
+}
+
+body.dark-mode .tab .close-btn:hover {
+  color: red;
+}
+
+#addTabBtn {
+  background-color: var(--secondary-color);
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 6px 12px;
+  font-size: 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 10px;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+#addTabBtn:hover {
+  background-color: #218838;
+  transform: translateY(-1px);
+}
+
+/* --- Toggle Switch --- */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+/* Styles for the editable tab title */
+.tab .edit-title {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-family: inherit;
+    color: inherit;
+    text-align: center;
+    padding: 0;
+    box-sizing: content-box;
+}
+
+body.dark-mode .tab .edit-title {
+  color: var(--text-dark);
 }

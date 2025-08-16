@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Simple Spreadsheet Extension",
-    "version": "1.1",
+    "version": "3.0.0",
     "description": "Opens a new tab with a simple spreadsheet interface.",
 
     "action": {
@@ -20,7 +20,7 @@
       "48": "images/icon_48.png",
       "128": "images/icon_128.png"
     },
-    "homepage_url": "https://www.arunsyoga.in", 
+    "homepage_url": "https://hashpallabs.com/", 
     "author": "HashPalLabs"
   }
   
