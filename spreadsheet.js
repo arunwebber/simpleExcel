@@ -26,11 +26,9 @@ class StateManager {
   }
 
   saveState() {
-    // History is now tied to the active sheet
     const currentSheetData = this.spreadsheet.tableManager.getCurrentData();
     const currentSheetName = this.spreadsheet.sheetManager.activeSheetName;
     
-    // Save state for the specific sheet
     if (!this.history[this.historyIndex] || JSON.stringify(currentSheetData) !== JSON.stringify(this.history[this.historyIndex].data)) {
         if (this.historyIndex < this.history.length - 1) {
             this.history = this.history.slice(0, this.historyIndex + 1);
@@ -162,238 +160,343 @@ class ContextMenuManager {
 }
 
 class TableManager {
-  constructor(spreadsheet) {
-    this.spreadsheet = spreadsheet;
-    this.table = spreadsheet.table;
-    this.addTableListeners();
-  }
-
-  addTableListeners() {
-    this.table.addEventListener("click", (event) => {
-      const cell = event.target.closest('td');
-      if (cell) {
-        const row = cell.parentElement.rowIndex - 1;
-        const col = cell.cellIndex - 1;
-        this.spreadsheet.lintingManager.highlightRowAndColumn(row, col);
-      }
-    });
-
-    this.table.addEventListener("input", () => this.spreadsheet.stateManager.saveState());
-
-    document.addEventListener("mouseup", (event) => {
-      const isResizer = event.target.className.includes('resizer');
-      if (isResizer) {
-        this.spreadsheet.stateManager.saveState();
-      }
-    });
-  }
-
-  createHeaderRow() {
-    const headerRow = document.createElement("tr");
-    headerRow.appendChild(document.createElement("th"));
-    for (let col = 1; col <= this.spreadsheet.numCols; col++) {
-      const th = document.createElement("th");
-      th.textContent = this.spreadsheet.getColumnName(col);
-      headerRow.appendChild(th);
+    constructor(spreadsheet) {
+        this.spreadsheet = spreadsheet;
+        this.table = spreadsheet.table;
+        this.currentSortCol = null;
+        this.currentSortDir = 'none';
+        this.addTableListeners();
     }
-    return headerRow;
-  }
 
-  createDataCell() {
-    const td = document.createElement("td");
-    const input = document.createElement("input");
-    input.type = "text";
+    addTableListeners() {
+        this.table.addEventListener("click", (event) => {
+            const cell = event.target.closest('td');
+            if (cell) {
+                const row = cell.parentElement.rowIndex - 1;
+                const col = cell.cellIndex - 1;
+                this.spreadsheet.lintingManager.highlightRowAndColumn(row, col);
+            }
+        });
 
-    td.appendChild(input);
-    td.appendChild(this.createResizer("resizer", "width", td));
-    td.appendChild(this.createResizer("resizer-row", "height", td));
+        this.table.addEventListener("click", (e) => {
+            const sortContainer = e.target.closest('.sort-container');
+            if (sortContainer) {
+                const headerCell = sortContainer.closest('th');
+                const colIndex = headerCell.cellIndex;
+                this.sort(colIndex);
+            }
+        });
 
-    return td;
-  }
+        this.table.addEventListener("input", () => this.spreadsheet.stateManager.saveState());
 
-  createResizer(className, dimension, td) {
-    const resizer = document.createElement("div");
-    resizer.className = className;
-    resizer.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      const start = dimension === "width" ? e.clientX : e.clientY;
-      const startSize = dimension === "width" ? td.offsetWidth : td.offsetHeight;
+        document.addEventListener("mouseup", (event) => {
+            const isResizer = event.target.className.includes('resizer');
+            if (isResizer) {
+                this.spreadsheet.stateManager.saveState();
+            }
+        });
+    }
 
-      const onMouseMove = (e) => {
-        const newSize = dimension === "width"
-          ? startSize + (e.clientX - start)
-          : startSize + (e.clientY - start);
+    createHeaderRow() {
+        const headerRow = document.createElement("tr");
+        headerRow.appendChild(document.createElement("th"));
+        for (let col = 1; col <= this.spreadsheet.numCols; col++) {
+            const th = document.createElement("th");
+            
+            const headerContent = document.createElement('div');
+            headerContent.className = 'header-content';
 
-        if (newSize > 20) {
-          if (dimension === "width") {
-            const colIndex = td.cellIndex;
-            // Apply to header cell
-            const headerCell = this.spreadsheet.table.querySelector(`tr:first-child th:nth-child(${colIndex + 1})`);
-            if (headerCell) headerCell.style.width = `${newSize}px`;
+            const headerText = document.createElement('span');
+            headerText.className = 'header-text';
+            headerText.textContent = this.spreadsheet.getColumnName(col);
+            headerContent.appendChild(headerText);
 
-            // Apply to all cells in this column
-            this.spreadsheet.table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`)
-              .forEach(cell => cell.style.width = `${newSize}px`);
-          } else {
-            td.style.height = `${newSize}px`;
-          }
+            const sortContainer = document.createElement('div');
+            sortContainer.className = 'sort-container';
+            
+            const upArrow = document.createElement('div');
+            upArrow.className = 'sort-arrow up';
+            sortContainer.appendChild(upArrow);
+            
+            const downArrow = document.createElement('div');
+            downArrow.className = 'sort-arrow down';
+            sortContainer.appendChild(downArrow);
+            
+            headerContent.appendChild(sortContainer);
+            th.appendChild(headerContent);
+            
+            headerRow.appendChild(th);
         }
-      };
-
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        this.spreadsheet.stateManager.saveState();
-      };
-
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    });
-    return resizer;
-  }
-
-  createTableRow() {
-    const tr = document.createElement("tr");
-    const rowHeader = document.createElement("th");
-    tr.appendChild(rowHeader);
-
-    for (let col = 0; col < this.spreadsheet.numCols; col++) {
-      tr.appendChild(this.createDataCell());
+        return headerRow;
     }
-    return tr;
-  }
 
-  createTable() {
-    this.table.innerHTML = "";
-    this.table.appendChild(this.createHeaderRow());
-    for (let row = 0; row < this.spreadsheet.numRows; row++) {
-      this.table.appendChild(this.createTableRow());
+    createDataCell() {
+        const td = document.createElement("td");
+        const input = document.createElement("input");
+        input.type = "text";
+
+        td.appendChild(input);
+        td.appendChild(this.createResizer("resizer", "width", td));
+        td.appendChild(this.createResizer("resizer-row", "height", td));
+
+        return td;
     }
-    this.updateRowHeaders();
-  }
 
-  addElement(isRow, position, index) {
-    if (isRow) {
-      const referenceIndex = (position === 'above') ? index : index + 1;
-      const newRow = this.createTableRow();
-      const referenceRow = this.table.rows[referenceIndex];
+    createResizer(className, dimension, td) {
+        const resizer = document.createElement("div");
+        resizer.className = className;
+        resizer.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            const start = dimension === "width" ? e.clientX : e.clientY;
+            const startSize = dimension === "width" ? td.offsetWidth : td.offsetHeight;
 
-      if (referenceRow) {
-        this.table.insertBefore(newRow, referenceRow);
-      } else {
-        this.table.appendChild(newRow);
-      }
-      this.spreadsheet.numRows++;
-      this.updateRowHeaders();
-    } else {
-      const referenceIndex = (position === 'left') ? index : index + 1;
-      const rows = this.table.querySelectorAll('tr');
+            const onMouseMove = (e) => {
+                const newSize = dimension === "width"
+                    ? startSize + (e.clientX - start)
+                    : startSize + (e.clientY - start);
 
-      rows.forEach((row, rowIndex) => {
-        if (rowIndex === 0) {
-          const th = document.createElement('th');
-          th.textContent = this.spreadsheet.getColumnName(this.spreadsheet.numCols + 1);
-          row.insertBefore(th, row.cells[referenceIndex]);
+                if (newSize > 20) {
+                    if (dimension === "width") {
+                        const colIndex = td.cellIndex;
+                        const headerCell = this.spreadsheet.table.querySelector(`tr:first-child th:nth-child(${colIndex + 1})`);
+                        if (headerCell) headerCell.style.width = `${newSize}px`;
+
+                        this.spreadsheet.table.querySelectorAll(`tr td:nth-child(${colIndex + 1})`)
+                            .forEach(cell => cell.style.width = `${newSize}px`);
+                    } else {
+                        td.style.height = `${newSize}px`;
+                    }
+                }
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+                this.spreadsheet.stateManager.saveState();
+            };
+
+            document.addEventListener("mousemove", onMouseMove);
+            document.addEventListener("mouseup", onMouseUp);
+        });
+        return resizer;
+    }
+
+    createTableRow() {
+        const tr = document.createElement("tr");
+        const rowHeader = document.createElement("th");
+        tr.appendChild(rowHeader);
+
+        for (let col = 0; col < this.spreadsheet.numCols; col++) {
+            tr.appendChild(this.createDataCell());
+        }
+        return tr;
+    }
+
+    createTable() {
+        this.table.innerHTML = "";
+        this.table.appendChild(this.createHeaderRow());
+        for (let row = 0; row < this.spreadsheet.numRows; row++) {
+            this.table.appendChild(this.createTableRow());
+        }
+        this.updateRowHeaders();
+    }
+
+    addElement(isRow, position, index) {
+        if (isRow) {
+            const referenceIndex = (position === 'above') ? index : index + 1;
+            const newRow = this.createTableRow();
+            const referenceRow = this.table.rows[referenceIndex];
+
+            if (referenceRow) {
+                this.table.insertBefore(newRow, referenceRow);
+            } else {
+                this.table.appendChild(newRow);
+            }
+            this.spreadsheet.numRows++;
+            this.updateRowHeaders();
         } else {
-          const td = this.createDataCell();
-          row.insertBefore(td, row.cells[referenceIndex]);
+            const referenceIndex = (position === 'left') ? index : index + 1;
+            const rows = this.table.querySelectorAll('tr');
+
+            rows.forEach((row, rowIndex) => {
+                if (rowIndex === 0) {
+                    const th = document.createElement('th');
+                    
+                    const headerContent = document.createElement('div');
+                    headerContent.className = 'header-content';
+
+                    const headerText = document.createElement('span');
+                    headerText.className = 'header-text';
+                    headerText.textContent = this.spreadsheet.getColumnName(this.spreadsheet.numCols + 1);
+                    headerContent.appendChild(headerText);
+
+                    const sortContainer = document.createElement('div');
+                    sortContainer.className = 'sort-container';
+                    
+                    const upArrow = document.createElement('div');
+                    upArrow.className = 'sort-arrow up';
+                    sortContainer.appendChild(upArrow);
+                    
+                    const downArrow = document.createElement('div');
+                    downArrow.className = 'sort-arrow down';
+                    sortContainer.appendChild(downArrow);
+                    
+                    headerContent.appendChild(sortContainer);
+                    th.appendChild(headerContent);
+                    row.insertBefore(th, row.cells[referenceIndex]);
+                } else {
+                    const td = this.createDataCell();
+                    row.insertBefore(td, row.cells[referenceIndex]);
+                }
+            });
+            this.spreadsheet.numCols++;
+            this.updateColumnHeaders();
         }
-      });
-      this.spreadsheet.numCols++;
-      this.updateColumnHeaders();
+        this.spreadsheet.stateManager.saveState();
     }
-    this.spreadsheet.stateManager.saveState();
-  }
 
-  deleteElement(isRow, index) {
-    if (isRow) {
-      if (this.spreadsheet.numRows <= 1) return;
-      this.table.deleteRow(index);
-      this.spreadsheet.numRows--;
-      this.updateRowHeaders();
-    } else {
-      if (this.spreadsheet.numCols <= 1) return;
-      const rows = this.table.querySelectorAll("tr");
-      rows.forEach(row => row.deleteCell(index));
-      this.spreadsheet.numCols--;
-      this.updateColumnHeaders();
+    deleteElement(isRow, index) {
+        if (isRow) {
+            if (this.spreadsheet.numRows <= 1) return;
+            this.table.deleteRow(index);
+            this.spreadsheet.numRows--;
+            this.updateRowHeaders();
+        } else {
+            if (this.spreadsheet.numCols <= 1) return;
+            const rows = this.table.querySelectorAll("tr");
+            rows.forEach(row => row.deleteCell(index));
+            this.spreadsheet.numCols--;
+            this.updateColumnHeaders();
+        }
+        this.spreadsheet.stateManager.saveState();
     }
-    this.spreadsheet.stateManager.saveState();
-  }
 
-  updateRowHeaders() {
-    const rows = this.table.querySelectorAll("tr");
-    for (let i = 1; i < rows.length; i++) {
-      const rowHeader = rows[i].querySelector("th");
-      if (rowHeader) rowHeader.textContent = i;
+    updateRowHeaders() {
+        const rows = this.table.querySelectorAll("tr");
+        for (let i = 1; i < rows.length; i++) {
+            const rowHeader = rows[i].querySelector("th");
+            if (rowHeader) rowHeader.textContent = i;
+        }
     }
-  }
 
-  updateColumnHeaders() {
-    const headerRow = this.table.querySelector("tr:first-child");
-    const headers = headerRow.querySelectorAll("th");
-    for (let i = 1; i < headers.length; i++) {
-      headers[i].textContent = this.spreadsheet.getColumnName(i);
+    updateColumnHeaders() {
+        const headerRow = this.table.querySelector("tr:first-child");
+        const headers = headerRow.querySelectorAll("th");
+        for (let i = 1; i < headers.length; i++) {
+            const headerText = headers[i].querySelector('.header-text');
+            if (headerText) {
+                headerText.textContent = this.spreadsheet.getColumnName(i);
+            }
+        }
     }
-  }
 
-  clearTable() {
-    // Clear cell values
-    this.table.querySelectorAll("td input").forEach(input => input.value = '');
-
-    // Reset widths & heights for all cells
-    this.table.querySelectorAll("td").forEach(td => {
-      td.style.width = '';
-      td.style.height = '';
-    });
-
-    // Reset widths for headers
-    this.table.querySelectorAll("tr:first-child th").forEach((th, i) => {
-      if (i > 0) th.style.width = '';
-    });
-
-    this.spreadsheet.stateManager.saveState();
-    this.spreadsheet.saveToLocalStorage(); // ensure cleared state is saved
-  }
-
-  getCurrentData() {
-    const data = [];
-    const rows = this.table.querySelectorAll('tr');
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
-      const rowData = [];
-      const cells = row.querySelectorAll('td');
-      cells.forEach(cell => {
-        const input = cell.querySelector('input');
-        rowData.push({
-          value: input.value,
-          width: cell.style.width,
-          height: cell.style.height
+    clearTable() {
+        this.table.querySelectorAll("td input").forEach(input => input.value = '');
+        this.table.querySelectorAll("td").forEach(td => {
+            td.style.width = '';
+            td.style.height = '';
         });
-      });
-      data.push(rowData);
-    }
-    return data;
-  }
-
-  loadData(data) {
-    const rows = this.table.querySelectorAll('tr');
-    for (let i = 1; i < rows.length; i++) {
-      const cells = rows[i].querySelectorAll('td');
-      if (data && data[i - 1]) {
-        cells.forEach((cell, colIndex) => {
-          const savedCell = data[i - 1][colIndex];
-          if (savedCell) {
-            cell.querySelector('input').value = savedCell.value || '';
-            if (savedCell.width) cell.style.width = savedCell.width;
-            if (savedCell.height) cell.style.height = savedCell.height;
-          }
+        this.table.querySelectorAll("tr:first-child th").forEach((th, i) => {
+            if (i > 0) th.style.width = '';
         });
-      }
+        this.spreadsheet.stateManager.saveState();
+        this.spreadsheet.saveToLocalStorage();
     }
-  }
+
+    getCurrentData() {
+        const data = [];
+        const rows = this.table.querySelectorAll('tr');
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            const rowData = [];
+            const cells = row.querySelectorAll('td');
+            cells.forEach(cell => {
+                const input = cell.querySelector('input');
+                rowData.push({
+                    value: input.value,
+                    width: cell.style.width,
+                    height: cell.style.height
+                });
+            });
+            data.push(rowData);
+        }
+        return data;
+    }
+
+    loadData(data) {
+        const rows = this.table.querySelectorAll('tr');
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].querySelectorAll('td');
+            if (data && data[i - 1]) {
+                cells.forEach((cell, colIndex) => {
+                    const savedCell = data[i - 1][colIndex];
+                    if (savedCell) {
+                        cell.querySelector('input').value = savedCell.value || '';
+                        if (savedCell.width) cell.style.width = savedCell.width;
+                        if (savedCell.height) cell.style.height = savedCell.height;
+                    }
+                });
+            }
+        }
+    }
+    
+    // The correct sort method that keeps adjacent rows together and re-renders the table
+    sort(colIndex) {
+        const headerCells = this.table.querySelector('tr').querySelectorAll('th');
+        
+        // Reset all sort indicators
+        headerCells.forEach(th => {
+            const upArrow = th.querySelector('.sort-arrow.up');
+            const downArrow = th.querySelector('.sort-arrow.down');
+            if (upArrow) upArrow.classList.remove('active');
+            if (downArrow) downArrow.classList.remove('active');
+        });
+
+        let newSortDir;
+        if (this.currentSortCol === colIndex) {
+            newSortDir = this.currentSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.currentSortCol = colIndex;
+            newSortDir = 'asc';
+        }
+
+        this.currentSortDir = newSortDir;
+        
+        const currentHeader = headerCells[colIndex];
+        const upArrow = currentHeader.querySelector('.sort-arrow.up');
+        const downArrow = currentHeader.querySelector('.sort-arrow.down');
+        
+        if (newSortDir === 'asc') {
+            if (upArrow) upArrow.classList.add('active');
+        } else {
+            if (downArrow) downArrow.classList.add('active');
+        }
+
+        // Get all data from the table into a temporary array
+        const tableData = this.getCurrentData();
+        
+        // Sort the temporary data array
+        tableData.sort((rowA, rowB) => {
+            const cellA = rowA[colIndex - 1].value;
+            const cellB = rowB[colIndex - 1].value;
+
+            const isNumeric = !isNaN(parseFloat(cellA)) && isFinite(cellA) && !isNaN(parseFloat(cellB)) && isFinite(cellB);
+            
+            let valA = isNumeric ? parseFloat(cellA) : cellA.toLowerCase();
+            let valB = isNumeric ? parseFloat(cellB) : cellB.toLowerCase();
+
+            if (valA < valB) return newSortDir === 'asc' ? -1 : 1;
+            if (valA > valB) return newSortDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        // Clear and re-render the table with the sorted data
+        this.clearTable();
+        this.loadData(tableData);
+        
+        this.spreadsheet.stateManager.saveState();
+    }
 }
-
 class SheetManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -445,7 +548,6 @@ class SheetManager {
     this.tabContainer.insertBefore(tab, this.addTabButton);
     tab.addEventListener('click', () => this.switchSheet(name));
 
-    // New Event Listener for double-click to rename
     tab.addEventListener('dblclick', () => this.handleTabTitleDoubleClick(tab));
   }
 
@@ -488,7 +590,6 @@ class SheetManager {
           return;
       }
 
-      // Preserve the order of sheets
       const orderedSheets = Object.keys(this.sheets);
       const newSheets = {};
       
@@ -501,24 +602,20 @@ class SheetManager {
       });
       this.sheets = newSheets;
 
-      // Update active sheet name
       if (this.activeSheetName === oldName) {
           this.activeSheetName = newName;
       }
 
-      // Update the history to reflect the new sheet name
       this.spreadsheet.stateManager.history.forEach(state => {
           if (state.sheet === oldName) {
               state.sheet = newName;
           }
       });
 
-      // Update the tab element
       const oldTab = this.tabContainer.querySelector(`[data-sheet-name="${oldName}"]`);
       if (oldTab) {
           oldTab.dataset.sheetName = newName;
           oldTab.querySelector('.tab-title').textContent = newName;
-          // Re-add event listeners to the new tab name to avoid issues
           oldTab.removeEventListener('click', this.switchSheet);
           oldTab.addEventListener('click', () => this.switchSheet(newName));
           oldTab.querySelector('.close-btn').removeEventListener('click', this.deleteSheet);
@@ -545,12 +642,11 @@ class SheetManager {
       tabToDelete.remove();
     }
 
-    // Determine the next sheet to activate
     const newActiveSheetNames = Object.keys(this.sheets);
     const newActiveSheetIndex = (deletedIndex === sheetNames.length - 1) ? deletedIndex - 1 : deletedIndex;
     this.switchSheet(newActiveSheetNames[newActiveSheetIndex]);
     
-    this.spreadsheet.saveToLocalStorage(); // This is the crucial line to persist the deletion
+    this.spreadsheet.saveToLocalStorage();
   }
 
   switchSheet(name) {
@@ -610,9 +706,10 @@ class DownloadPrintManager {
             if (cols[j].tagName === "TD") {
                 cellValue = cols[j].querySelector("input").value;
             } else if (cols[j].tagName === "TH") {
-                cellValue = cols[j].innerText;
+                cellValue = cols[j].innerText.trim();
+                cellValue = cellValue.replace(/\s*$/, ''); // Remove trailing space from the sort indicator
             }
-            row.push(cellValue);
+            row.push(`"${cellValue.replace(/"/g, '""')}"`); // Handle commas and quotes
         }
         csv.push(row.join(","));
     }
@@ -631,7 +728,12 @@ class DownloadPrintManager {
     const tableToPrint = this.spreadsheet.table.outerHTML;
     const printWindow = window.open('', '', 'height=600,width=800');
     printWindow.document.write('<html><head><title>Print Spreadsheet</title>');
-    printWindow.document.write('<style>table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid black; padding: 8px; text-align: left; } th { background-color: #f2f2f2; }</style>');
+    printWindow.document.write('<style>');
+    printWindow.document.write('body { font-family: Arial, sans-serif; }');
+    printWindow.document.write('table { border-collapse: collapse; width: 100%; }');
+    printWindow.document.write('th, td { border: 1px solid #000; padding: 8px; text-align: left; }');
+    printWindow.document.write('th { background-color: #f2f2f2; }');
+    printWindow.document.write('</style>');
     printWindow.document.write('</head><body>');
     printWindow.document.write(tableToPrint);
     printWindow.document.write('</body></html>');
@@ -642,119 +744,96 @@ class DownloadPrintManager {
 }
 
 class Spreadsheet {
-  constructor(numRows = 25, numCols = 25) {
+  constructor(numRows, numCols, tableId = 'spreadsheet') {
     this.numRows = numRows;
     this.numCols = numCols;
-    this.table = document.getElementById("spreadsheet");
+    this.table = document.getElementById(tableId);
 
+    this.tableManager = new TableManager(this);
     this.stateManager = new StateManager(this);
     this.lintingManager = new LintingManager(this);
     this.contextMenuManager = new ContextMenuManager(this);
-    this.tableManager = new TableManager(this);
     this.sheetManager = new SheetManager(this);
     this.downloadPrintManager = new DownloadPrintManager(this);
 
-    this.loadFromLocalStorage();
-    this.addEventListeners();
-    this.loadDarkModePreference();
-  }
+    this.loadState();
+    this.addGlobalListeners();
 
-  getColumnName(colIndex) {
-    let columnName = '';
-    while (colIndex > 0) {
-      columnName = String.fromCharCode(65 + ((colIndex - 1) % 26)) + columnName;
-      colIndex = Math.floor((colIndex - 1) / 26);
+    const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
+    if (!storedState || Object.keys(storedState.sheets).length === 0) {
+      this.sheetManager.addSheet();
+    } else {
+      this.sheetManager.loadSheets(storedState.sheets, storedState.activeSheet);
     }
-    return columnName;
   }
 
-  addEventListeners() {
-    document.getElementById("clearBtn")?.addEventListener("click", () => {
-      this.tableManager.clearTable();
-    });
-
-    document.getElementById("downloadBtn")?.addEventListener("click", () => {
-      this.downloadPrintManager.downloadAsCSV();
-    });
-
-    document.getElementById("printBtn")?.addEventListener("click", () => {
-      this.downloadPrintManager.printTable();
-    });
-
+  addGlobalListeners() {
+    document.getElementById("clearBtn").addEventListener("click", () => this.tableManager.clearTable());
+    document.getElementById("downloadBtn").addEventListener("click", () => this.downloadPrintManager.downloadAsCSV());
+    document.getElementById("printBtn").addEventListener("click", () => this.downloadPrintManager.printTable());
+    document.getElementById("darkModeToggle").addEventListener("change", (e) => this.toggleDarkMode(e.target.checked));
     document.addEventListener("keydown", (e) => this.stateManager.handleKeyboardShortcuts(e));
-
-    const darkModeToggle = document.getElementById("darkModeToggle");
-    darkModeToggle?.addEventListener("change", () => {
-      if (darkModeToggle.checked) {
-        document.body.classList.add("dark-mode");
-        localStorage.setItem("darkMode", "enabled");
-      } else {
-        document.body.classList.remove("dark-mode");
-        localStorage.setItem("darkMode", "disabled");
-      }
-    });
-  }
-  
-  loadDarkModePreference() {
-    const darkModeEnabled = localStorage.getItem("darkMode") === "enabled";
-    const darkModeToggle = document.getElementById("darkModeToggle");
-
-    if (darkModeEnabled) {
-      document.body.classList.add("dark-mode");
-      if (darkModeToggle) {
-        darkModeToggle.checked = true;
-      }
-    }
   }
 
   saveToLocalStorage() {
     this.sheetManager.saveActiveSheetState();
-    const saveObj = {
+    const state = {
       sheets: this.sheetManager.sheets,
       activeSheet: this.sheetManager.activeSheetName,
-      history: this.stateManager.history,
-      historyIndex: this.stateManager.historyIndex
+      darkMode: document.body.classList.contains('dark-mode')
     };
-    StorageManager.saveToLocalStorage('spreadsheetData', saveObj);
+    StorageManager.saveToLocalStorage('spreadsheetState', state);
   }
 
-  loadFromLocalStorage() {
-    const saved = StorageManager.getFromLocalStorage('spreadsheetData');
-    if (saved && saved.sheets && saved.activeSheet) {
-      this.stateManager.history = saved.history || [];
-      this.stateManager.historyIndex = saved.historyIndex || -1;
-      this.sheetManager.loadSheets(saved.sheets, saved.activeSheet);
+  loadState() {
+    const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
+    if (storedState) {
+      if (storedState.darkMode) {
+        document.body.classList.add('dark-mode');
+        document.getElementById("darkModeToggle").checked = true;
+      }
+    }
+  }
+
+  toggleDarkMode(isDarkMode) {
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
     } else {
-      this.sheetManager.addSheet();
-      this.stateManager.saveState();
+      document.body.classList.remove('dark-mode');
     }
+    this.saveToLocalStorage();
   }
 
-  applyColumnWidths(columnWidths) {
-    if (columnWidths) {
-      const headerCells = this.table.querySelector("tr:first-child")?.querySelectorAll("th");
-      columnWidths.forEach((w, i) => {
-        if (w) {
-          if (headerCells[i + 1]) {
-            headerCells[i + 1].style.width = w;
-            this.table.querySelectorAll(`tr td:nth-child(${i + 2})`)
-              .forEach(td => td.style.width = w);
-          }
-        }
-      });
+  getColumnName(index) {
+    let temp,
+      letter = '';
+    while (index > 0) {
+      temp = (index - 1) % 26;
+      letter = String.fromCharCode(temp + 65) + letter;
+      index = (index - temp - 1) / 26;
     }
+    return letter;
   }
 
   getColumnWidths() {
-    const columnWidths = [];
-    const headerCells = this.table.querySelector("tr:first-child")?.querySelectorAll("th");
-    if (headerCells) {
-      headerCells.forEach((th, i) => {
-        if (i > 0) columnWidths.push(th.style.width || null);
-      });
+    const widths = [];
+    const headerCells = this.table.querySelectorAll('tr:first-child th');
+    for (let i = 1; i < headerCells.length; i++) {
+      widths.push(headerCells[i].style.width);
     }
-    return columnWidths;
+    return widths;
+  }
+
+  applyColumnWidths(widths) {
+    const headerCells = this.table.querySelectorAll('tr:first-child th');
+    for (let i = 1; i < headerCells.length; i++) {
+      if (widths[i - 1]) {
+        headerCells[i].style.width = widths[i - 1];
+      }
+    }
   }
 }
 
-const spreadsheet = new Spreadsheet();
+document.addEventListener('DOMContentLoaded', () => {
+  new Spreadsheet(25, 25);
+});

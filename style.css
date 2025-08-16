@@ -126,35 +126,120 @@ body.dark-mode .container {
 /* Table styling */
 table {
   border-collapse: collapse;
-  /* Key changes below */
-  table-layout: fixed; /* This is crucial. It prevents columns from auto-resizing. */
+  table-layout: fixed;
   width: auto;
-  min-width: 2000px; /* Set a large minimum width to force horizontal scrolling. */
+  min-width: 2000px;
 }
 
 td, th {
   border: 1px solid #ddd;
-  width: 100px; /* Keep a consistent base width for cells */
+  width: 100px;
   height: 30px;
   text-align: center;
   position: relative;
 }
 
 th {
+  border: 1px solid #ddd;
+  width: 100px;
+  height: 30px;
+  position: relative;
+  cursor: pointer;
   background-color: #f0f0f0;
   font-weight: bold;
+  text-align: left;
+  padding: 0;
+}
+
+th:first-child {
+  cursor: default;
+  background-color: #e0e0e0;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+}
+
+.header-text {
+  flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sort-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 25px;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.sort-container:hover {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.sort-container .sort-arrow {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  opacity: 0.3;
+}
+
+.sort-container .sort-arrow.up {
+  border-bottom: 6px solid var(--text-light);
+}
+
+.sort-container .sort-arrow.down {
+  border-top: 6px solid var(--text-light);
+}
+
+.sort-container .sort-arrow.active {
+  opacity: 1;
 }
 
 body.dark-mode th {
-    background-color: #2a2a2a;
-    color: #f0f0f0;
-    border-color: #444;
+  background-color: #2a2a2a;
+  color: #f0f0f0;
+  border-color: #444;
 }
 
+body.dark-mode th:first-child {
+  background-color: #333;
+}
+
+body.dark-mode .sort-container {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+body.dark-mode .sort-container:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+body.dark-mode .sort-container .sort-arrow.up {
+  border-bottom: 6px solid var(--text-dark);
+}
+
+body.dark-mode .sort-container .sort-arrow.down {
+  border-top: 6px solid var(--text-dark);
+}
+
+
 body.dark-mode td {
-    background-color: #1e1e1e;
-    color: #f0f0f0;
-    border-color: #444;
+  background-color: #1e1e1e;
+  color: #f0f0f0;
+  border-color: #444;
 }
 
 td input {
