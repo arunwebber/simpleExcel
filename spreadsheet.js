@@ -1,4 +1,3 @@
-// A simple class to handle localStorage operations
 class StorageManager {
   static saveToLocalStorage(key, value) {
     try {
@@ -19,7 +18,6 @@ class StorageManager {
   }
 }
 
-// Manages the state history for undo/redo functionality
 class StateManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -27,37 +25,29 @@ class StateManager {
     this.historyIndex = -1;
   }
 
-  // Save the current state of the spreadsheet to the history stack
   saveState() {
-    // Get the current data from the table
     const currentState = this.spreadsheet.tableManager.getCurrentData();
     const lastState = this.history[this.historyIndex];
 
-    // Don't save if the state hasn't changed
     if (JSON.stringify(currentState) === JSON.stringify(lastState)) {
       return;
     }
 
-    // Trim the history if we've undone actions
     if (this.historyIndex < this.history.length - 1) {
       this.history = this.history.slice(0, this.historyIndex + 1);
     }
 
-    // Push the new state and update the index
     this.history.push(currentState);
     this.historyIndex++;
 
-    // Keep the history stack from getting too large
     if (this.history.length > 50) {
       this.history.shift();
       this.historyIndex--;
     }
 
-    // Save the state to localStorage
     this.spreadsheet.saveToLocalStorage();
   }
 
-  // Undo the last action
   undo() {
     if (this.historyIndex > 0) {
       this.historyIndex--;
@@ -66,7 +56,6 @@ class StateManager {
     }
   }
 
-  // Redo the last undone action
   redo() {
     if (this.historyIndex < this.history.length - 1) {
       this.historyIndex++;
@@ -75,7 +64,6 @@ class StateManager {
     }
   }
 
-  // Handle keyboard shortcuts (Ctrl+Z and Ctrl+Y)
   handleKeyboardShortcuts(event) {
     if (event.ctrlKey) {
       if (event.key === 'z' || event.key === 'Z') {
@@ -89,7 +77,6 @@ class StateManager {
   }
 }
 
-// Manages highlighting of rows and columns
 class LintingManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -99,11 +86,9 @@ class LintingManager {
     this.clearHighlighting();
     const tableRows = this.spreadsheet.table.querySelectorAll("tr");
     
-    // Highlight the row header
     const rowHeader = tableRows[row + 1]?.querySelector("th");
     if (rowHeader) rowHeader.classList.add("highlight-row");
 
-    // Highlight the column header
     const headerCells = tableRows[0]?.querySelectorAll("th");
     if (headerCells && headerCells[col + 1]) headerCells[col + 1].classList.add("highlight-col");
   }
@@ -114,7 +99,6 @@ class LintingManager {
   }
 }
 
-// Manages the right-click context menu
 class ContextMenuManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -128,7 +112,6 @@ class ContextMenuManager {
     this.spreadsheet.table.addEventListener("contextmenu", this.showContextMenu.bind(this));
     document.addEventListener("click", () => this.contextMenu.style.display = 'none');
     
-    // Attach event listeners to all context menu buttons
     document.getElementById("addRowAboveBtn").addEventListener("click", () => this.spreadsheet.tableManager.addElement(true, 'above', this.selectedRow));
     document.getElementById("addRowBelowBtn").addEventListener("click", () => this.spreadsheet.tableManager.addElement(true, 'below', this.selectedRow));
     document.getElementById("addColLeftBtn").addEventListener("click", () => this.spreadsheet.tableManager.addElement(false, 'left', this.selectedCol));
@@ -151,7 +134,6 @@ class ContextMenuManager {
     const isRowHeader = cell.tagName === 'TH' && !isHeaderRow;
     const isColHeader = cell.tagName === 'TH' && isHeaderRow;
 
-    // Show/hide buttons based on what was clicked
     document.getElementById("addRowAboveBtn").style.display = isRowHeader ? 'block' : 'none';
     document.getElementById("addRowBelowBtn").style.display = isRowHeader ? 'block' : 'none';
     document.getElementById("deleteRowBtn").style.display = isRowHeader ? 'block' : 'none';
@@ -159,7 +141,6 @@ class ContextMenuManager {
     document.getElementById("addColRightBtn").style.display = isColHeader ? 'block' : 'none';
     document.getElementById("deleteColBtn").style.display = isColHeader ? 'block' : 'none';
 
-    // Update selected row and column
     if (isRowHeader) {
       this.selectedRow = parentRow.rowIndex;
       this.selectedCol = null;
@@ -167,19 +148,16 @@ class ContextMenuManager {
       this.selectedRow = null;
       this.selectedCol = cell.cellIndex;
     } else {
-      // Don't show the context menu for data cells
       this.contextMenu.style.display = 'none';
       return;
     }
 
-    // Position and display the menu
     this.contextMenu.style.display = 'block';
     this.contextMenu.style.left = `${event.pageX}px`;
     this.contextMenu.style.top = `${event.pageY}px`;
   }
 }
 
-// Manages all table-related DOM manipulation
 class TableManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -187,16 +165,13 @@ class TableManager {
     this.addTableListeners();
   }
 
-  // New method to centralize all cell event listeners
   addTableListeners() {
     this.table.addEventListener("click", (event) => {
       const cell = event.target.closest('td');
       if (cell) {
-        // Find the current row and column index of the clicked cell
-        const row = cell.parentElement.rowIndex - 1; // Subtract 1 for header row
-        const col = cell.cellIndex - 1; // Subtract 1 for row header column
+        const row = cell.parentElement.rowIndex - 1;
+        const col = cell.cellIndex - 1;
         
-        // Correctly highlight the current row and column
         this.spreadsheet.lintingManager.highlightRowAndColumn(row, col);
       }
     });
@@ -206,7 +181,6 @@ class TableManager {
     });
   }
 
-  // The rest of the methods remain the same as the previous correct code
   createHeaderRow() {
     const headerRow = document.createElement("tr");
     headerRow.appendChild(document.createElement("th"));
@@ -243,7 +217,7 @@ class TableManager {
                 startSize + (e.clientX - start) :
                 startSize + (e.clientY - start);
             
-            if (newSize > 20) { // Prevents the cell from becoming too small
+            if (newSize > 20) {
                 if (dimension === "width") {
                     td.style.width = `${newSize}px`;
                 } else {
@@ -380,22 +354,20 @@ class TableManager {
   }
 }
 
-// The main class that ties everything together
 class Spreadsheet {
   constructor(numRows = 25, numCols = 25) {
     this.numRows = numRows;
     this.numCols = numCols;
     this.table = document.getElementById("spreadsheet");
 
-    // Initialize managers
     this.stateManager = new StateManager(this);
     this.lintingManager = new LintingManager(this);
     this.contextMenuManager = new ContextMenuManager(this);
     this.tableManager = new TableManager(this);
     
-    // Load existing data or create a new table
     this.loadFromLocalStorage();
     this.addEventListeners();
+    this.loadDarkModePreference();
   }
 
   getColumnName(colIndex) {
@@ -408,16 +380,36 @@ class Spreadsheet {
   }
 
   addEventListeners() {
-    // Add clear button listener
     document.getElementById("clearBtn")?.addEventListener("click", () => {
       this.tableManager.clearTable();
     });
 
-    // Save state on every input change
-    this.table.addEventListener("input", () => this.stateManager.saveState());
-
-    // Handle keyboard shortcuts
     document.addEventListener("keydown", (e) => this.stateManager.handleKeyboardShortcuts(e));
+    
+    // Dark mode toggle listener
+    const darkModeToggle = document.getElementById("darkModeToggle");
+    darkModeToggle?.addEventListener("change", () => {
+      if (darkModeToggle.checked) {
+        document.body.classList.add("dark-mode");
+        localStorage.setItem("darkMode", "enabled");
+      } else {
+        document.body.classList.remove("dark-mode");
+        localStorage.setItem("darkMode", "disabled");
+      }
+    });
+  }
+
+  // New method to load dark mode preference on page load
+  loadDarkModePreference() {
+    const darkModeEnabled = localStorage.getItem("darkMode") === "enabled";
+    const darkModeToggle = document.getElementById("darkModeToggle");
+
+    if (darkModeEnabled) {
+      document.body.classList.add("dark-mode");
+      if (darkModeToggle) {
+        darkModeToggle.checked = true;
+      }
+    }
   }
 
   saveToLocalStorage() {
@@ -440,10 +432,9 @@ class Spreadsheet {
       this.stateManager.historyIndex = 0;
     } else {
       this.tableManager.createTable();
-      this.stateManager.saveState(); // Save the initial empty state
+      this.stateManager.saveState();
     }
   }
 }
 
-// Initialize the spreadsheet
 const spreadsheet = new Spreadsheet();
