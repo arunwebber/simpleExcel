@@ -439,27 +439,38 @@ class TableManager {
     }
 
     loadData(data) {
+        if (!data || data.length === 0) return;
+
+        // Ensure table has enough rows
+        const requiredRows = data.length;
+        while (this.spreadsheet.numRows < requiredRows) {
+            this.addElement(true, 'below', this.spreadsheet.numRows);
+        }
+
+        // Ensure table has enough columns
+        const requiredCols = data[0].length;
+        while (this.spreadsheet.numCols < requiredCols) {
+            this.addElement(false, 'right', this.spreadsheet.numCols);
+        }
+
         const rows = this.table.querySelectorAll('tr');
         for (let i = 1; i < rows.length; i++) {
             const cells = rows[i].querySelectorAll('td');
-            if (data && data[i - 1]) {
-                cells.forEach((cell, colIndex) => {
-                    const savedCell = data[i - 1][colIndex];
-                    if (savedCell) {
-                        cell.querySelector('input').value = savedCell.value || '';
-                        if (savedCell.width) cell.style.width = savedCell.width;
-                        if (savedCell.height) cell.style.height = savedCell.height;
-                    }
-                });
-            }
+            const rowData = data[i - 1] || [];
+            cells.forEach((cell, colIndex) => {
+                const savedCell = rowData[colIndex];
+                if (savedCell) {
+                    cell.querySelector('input').value = savedCell.value || '';
+                    if (savedCell.width) cell.style.width = savedCell.width;
+                    if (savedCell.height) cell.style.height = savedCell.height;
+                }
+            });
         }
     }
 
-    // The corrected sort method
     sort(colIndex) {
         const headerCells = this.table.querySelector('tr').querySelectorAll('th');
 
-        // Reset all sort indicators
         headerCells.forEach(th => {
             const upArrow = th.querySelector('.sort-arrow.up');
             const downArrow = th.querySelector('.sort-arrow.down');
@@ -487,15 +498,12 @@ class TableManager {
             if (downArrow) downArrow.classList.add('active');
         }
 
-        // Get all data from the table into a temporary array
         const tableData = this.getCurrentData();
 
-        // Sort the temporary data array with the new logic
         tableData.sort((rowA, rowB) => {
             const cellA = rowA[colIndex - 1].value;
             const cellB = rowB[colIndex - 1].value;
 
-            // Handle empty cells by placing them at the end
             const aIsEmpty = cellA === null || cellA.trim() === '';
             const bIsEmpty = cellB === null || cellB.trim() === '';
 
@@ -503,7 +511,6 @@ class TableManager {
             if (!aIsEmpty && bIsEmpty) return -1;
             if (aIsEmpty && bIsEmpty) return 0;
 
-            // Now, perform the standard sort on non-empty values
             const isNumeric = !isNaN(parseFloat(cellA)) && isFinite(cellA) && !isNaN(parseFloat(cellB)) && isFinite(cellB);
 
             let valA = isNumeric ? parseFloat(cellA) : cellA.toLowerCase();
@@ -514,13 +521,13 @@ class TableManager {
             return 0;
         });
 
-        // Clear and re-render the table with the sorted data
         this.clearTable();
         this.loadData(tableData);
 
         this.spreadsheet.stateManager.saveState();
     }
 }
+
 class SheetManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
