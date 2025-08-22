@@ -132,7 +132,7 @@ table {
 }
 
 td, th {
-  border: 1px solid #ddd;
+  border: 1px solid #b4b0b0;
   width: 100px;
   height: 30px;
   text-align: center;
@@ -149,6 +149,7 @@ th {
   font-weight: bold;
   text-align: left;
   padding: 0;
+  border-bottom: 2px solid #d8d5d5; /* Add this line */
 }
 
 th:first-child {

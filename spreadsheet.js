@@ -86,19 +86,34 @@ class LintingManager {
   highlightRowAndColumn(row, col) {
     this.clearHighlighting();
     const tableRows = this.spreadsheet.table.querySelectorAll("tr");
-    
-    const rowHeader = tableRows[row + 1]?.querySelector("th");
-    if (rowHeader) rowHeader.classList.add("highlight-row");
 
-    const headerCells = tableRows[0]?.querySelectorAll("th");
-    if (headerCells && headerCells[col + 1]) headerCells[col + 1].classList.add("highlight-col");
+    // ✅ Highlight the entire row (row + 1 to skip column headers)
+    const targetRow = tableRows[row + 1];
+    if (targetRow) {
+      targetRow.querySelectorAll("th, td").forEach(cell =>
+        cell.classList.add("highlight-row")
+      );
+    }
+
+    // ✅ Highlight the entire column (col + 1 to skip row headers)
+    tableRows.forEach((tr) => {
+      const cells = tr.querySelectorAll("th, td");
+      if (cells[col + 1]) {
+        cells[col + 1].classList.add("highlight-col");
+      }
+    });
   }
 
   clearHighlighting() {
-    document.querySelectorAll(".highlight-row").forEach(el => el.classList.remove("highlight-row"));
-    document.querySelectorAll(".highlight-col").forEach(el => el.classList.remove("highlight-col"));
+    document.querySelectorAll(".highlight-row").forEach(el =>
+      el.classList.remove("highlight-row")
+    );
+    document.querySelectorAll(".highlight-col").forEach(el =>
+      el.classList.remove("highlight-col")
+    );
   }
 }
+
 
 class ContextMenuManager {
   constructor(spreadsheet) {
