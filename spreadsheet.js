@@ -217,7 +217,7 @@ class TableManager {
         headerRow.appendChild(document.createElement("th"));
         for (let col = 1; col <= this.spreadsheet.numCols; col++) {
             const th = document.createElement("th");
-            
+
             const headerContent = document.createElement('div');
             headerContent.className = 'header-content';
 
@@ -228,18 +228,18 @@ class TableManager {
 
             const sortContainer = document.createElement('div');
             sortContainer.className = 'sort-container';
-            
+
             const upArrow = document.createElement('div');
             upArrow.className = 'sort-arrow up';
             sortContainer.appendChild(upArrow);
-            
+
             const downArrow = document.createElement('div');
             downArrow.className = 'sort-arrow down';
             sortContainer.appendChild(downArrow);
-            
+
             headerContent.appendChild(sortContainer);
             th.appendChild(headerContent);
-            
+
             headerRow.appendChild(th);
         }
         return headerRow;
@@ -336,7 +336,7 @@ class TableManager {
             rows.forEach((row, rowIndex) => {
                 if (rowIndex === 0) {
                     const th = document.createElement('th');
-                    
+
                     const headerContent = document.createElement('div');
                     headerContent.className = 'header-content';
 
@@ -347,15 +347,15 @@ class TableManager {
 
                     const sortContainer = document.createElement('div');
                     sortContainer.className = 'sort-container';
-                    
+
                     const upArrow = document.createElement('div');
                     upArrow.className = 'sort-arrow up';
                     sortContainer.appendChild(upArrow);
-                    
+
                     const downArrow = document.createElement('div');
                     downArrow.className = 'sort-arrow down';
                     sortContainer.appendChild(downArrow);
-                    
+
                     headerContent.appendChild(sortContainer);
                     th.appendChild(headerContent);
                     row.insertBefore(th, row.cells[referenceIndex]);
@@ -454,11 +454,11 @@ class TableManager {
             }
         }
     }
-    
-    // The correct sort method that keeps adjacent rows together and re-renders the table
+
+    // The corrected sort method
     sort(colIndex) {
         const headerCells = this.table.querySelector('tr').querySelectorAll('th');
-        
+
         // Reset all sort indicators
         headerCells.forEach(th => {
             const upArrow = th.querySelector('.sort-arrow.up');
@@ -476,11 +476,11 @@ class TableManager {
         }
 
         this.currentSortDir = newSortDir;
-        
+
         const currentHeader = headerCells[colIndex];
         const upArrow = currentHeader.querySelector('.sort-arrow.up');
         const downArrow = currentHeader.querySelector('.sort-arrow.down');
-        
+
         if (newSortDir === 'asc') {
             if (upArrow) upArrow.classList.add('active');
         } else {
@@ -489,14 +489,23 @@ class TableManager {
 
         // Get all data from the table into a temporary array
         const tableData = this.getCurrentData();
-        
-        // Sort the temporary data array
+
+        // Sort the temporary data array with the new logic
         tableData.sort((rowA, rowB) => {
             const cellA = rowA[colIndex - 1].value;
             const cellB = rowB[colIndex - 1].value;
 
+            // Handle empty cells by placing them at the end
+            const aIsEmpty = cellA === null || cellA.trim() === '';
+            const bIsEmpty = cellB === null || cellB.trim() === '';
+
+            if (aIsEmpty && !bIsEmpty) return 1;
+            if (!aIsEmpty && bIsEmpty) return -1;
+            if (aIsEmpty && bIsEmpty) return 0;
+
+            // Now, perform the standard sort on non-empty values
             const isNumeric = !isNaN(parseFloat(cellA)) && isFinite(cellA) && !isNaN(parseFloat(cellB)) && isFinite(cellB);
-            
+
             let valA = isNumeric ? parseFloat(cellA) : cellA.toLowerCase();
             let valB = isNumeric ? parseFloat(cellB) : cellB.toLowerCase();
 
@@ -504,11 +513,11 @@ class TableManager {
             if (valA > valB) return newSortDir === 'asc' ? 1 : -1;
             return 0;
         });
-        
+
         // Clear and re-render the table with the sorted data
         this.clearTable();
         this.loadData(tableData);
-        
+
         this.spreadsheet.stateManager.saveState();
     }
 }
