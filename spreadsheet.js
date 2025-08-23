@@ -174,6 +174,139 @@ class ContextMenuManager {
   }
 }
 
+class FormulaManager {
+    constructor(spreadsheet) {
+        this.spreadsheet = spreadsheet;
+        this.cache = new Map();
+        this.precedence = {
+            '+': 1,
+            '-': 1,
+            '*': 2,
+            '/': 2,
+        };
+    }
+
+    isOperator(token) {
+        return token in this.precedence;
+    }
+
+    toPostfix(expression) {
+        const outputQueue = [];
+        const operatorStack = [];
+        const tokens = expression.match(/([A-Z]+[0-9]+|\d+(\.\d+)?|[+\-*/()]| )/g).filter(t => t.trim() !== '');
+
+        for (const token of tokens) {
+            if (!isNaN(parseFloat(token))) {
+                outputQueue.push(token);
+            } else if (token.match(/[A-Z]+[0-9]+/)) {
+                outputQueue.push(token);
+            } else if (this.isOperator(token)) {
+                while (
+                    operatorStack.length > 0 &&
+                    this.isOperator(operatorStack[operatorStack.length - 1]) &&
+                    this.precedence[operatorStack[operatorStack.length - 1]] >= this.precedence[token]
+                ) {
+                    outputQueue.push(operatorStack.pop());
+                }
+                operatorStack.push(token);
+            } else if (token === '(') {
+                operatorStack.push(token);
+            } else if (token === ')') {
+                while (operatorStack.length > 0 && operatorStack[operatorStack.length - 1] !== '(') {
+                    outputQueue.push(operatorStack.pop());
+                }
+                if (operatorStack[operatorStack.length - 1] === '(') {
+                    operatorStack.pop();
+                }
+            }
+        }
+        while (operatorStack.length > 0) {
+            outputQueue.push(operatorStack.pop());
+        }
+        return outputQueue;
+    }
+
+    evaluatePostfix(postfix) {
+        const stack = [];
+        for (const token of postfix) {
+            if (!isNaN(parseFloat(token))) {
+                stack.push(parseFloat(token));
+            } else if (this.isOperator(token)) {
+                if (stack.length < 2) {
+                    return '#ERROR!';
+                }
+                const operand2 = stack.pop();
+                const operand1 = stack.pop();
+                let result;
+                switch (token) {
+                    case '+':
+                        result = operand1 + operand2;
+                        break;
+                    case '-':
+                        result = operand1 - operand2;
+                        break;
+                    case '*':
+                        result = operand1 * operand2;
+                        break;
+                    case '/':
+                        if (operand2 === 0) return '#DIV/0!';
+                        result = operand1 / operand2;
+                        break;
+                }
+                stack.push(result);
+            }
+        }
+
+        if (stack.length !== 1) {
+            return '#ERROR!';
+        }
+
+        return stack.pop();
+    }
+
+    evaluateFormula(formula) {
+        if (this.cache.has(formula)) {
+            return this.cache.get(formula);
+        }
+
+        try {
+            let expression = formula.substring(1).toUpperCase();
+            
+            if (expression.trim() === '') {
+                return '';
+            }
+            
+            // Replace cell references with their values
+            expression = expression.replace(/[A-Z]+[0-9]+/g, (match) => {
+                const colName = match.match(/[A-Z]+/)[0];
+                const rowNum = parseInt(match.match(/[0-9]+/)[0], 10);
+                const colIndex = this.spreadsheet.columnNameToIndex(colName);
+                const cell = this.spreadsheet.table.querySelector(`tr:nth-child(${rowNum + 1}) td:nth-child(${colIndex + 2})`);
+                
+                if (cell) {
+                    const value = cell.querySelector('input').value;
+                    const parsedValue = parseFloat(value);
+                    return isNaN(parsedValue) ? 0 : parsedValue;
+                }
+                return 0;
+            });
+            
+            const postfix = this.toPostfix(expression);
+            const result = this.evaluatePostfix(postfix);
+
+            if (result === Infinity || result === -Infinity) {
+                return '#DIV/0!';
+            }
+            
+            this.cache.set(formula, result);
+            return result;
+        } catch (e) {
+            console.error("Formula evaluation error:", e);
+            return '#ERROR!';
+        }
+    }
+}
+
 class TableManager {
     constructor(spreadsheet) {
         this.spreadsheet = spreadsheet;
@@ -202,8 +335,18 @@ class TableManager {
             }
         });
 
-        this.table.addEventListener("input", () => this.spreadsheet.stateManager.saveState());
-
+        this.table.addEventListener("input", (e) => {
+            const inputElement = e.target;
+            const cell = inputElement.closest('td');
+            if (cell) {
+                const rowIndex = cell.parentElement.rowIndex - 1;
+                const colIndex = cell.cellIndex - 1;
+                this.spreadsheet.formulaManager.cache.clear();
+                this.spreadsheet.recalculateAllFormulas();
+            }
+            this.spreadsheet.stateManager.saveState();
+        });
+        
         document.addEventListener("mouseup", (event) => {
             const isResizer = event.target.className.includes('resizer');
             if (isResizer) {
@@ -253,7 +396,7 @@ class TableManager {
         td.appendChild(input);
         td.appendChild(this.createResizer("resizer", "width", td));
         td.appendChild(this.createResizer("resizer-row", "height", td));
-
+        
         return td;
     }
 
@@ -406,7 +549,10 @@ class TableManager {
     }
 
     clearTable() {
-        this.table.querySelectorAll("td input").forEach(input => input.value = '');
+        this.table.querySelectorAll("td input").forEach(input => {
+          input.value = '';
+          input.dataset.formula = '';
+        });
         this.table.querySelectorAll("td").forEach(td => {
             td.style.width = '';
             td.style.height = '';
@@ -429,6 +575,7 @@ class TableManager {
                 const input = cell.querySelector('input');
                 rowData.push({
                     value: input.value,
+                    formula: input.dataset.formula || '',
                     width: cell.style.width,
                     height: cell.style.height
                 });
@@ -460,12 +607,15 @@ class TableManager {
             cells.forEach((cell, colIndex) => {
                 const savedCell = rowData[colIndex];
                 if (savedCell) {
-                    cell.querySelector('input').value = savedCell.value || '';
+                    const input = cell.querySelector('input');
+                    input.value = savedCell.value || '';
+                    input.dataset.formula = savedCell.formula || '';
                     if (savedCell.width) cell.style.width = savedCell.width;
                     if (savedCell.height) cell.style.height = savedCell.height;
                 }
             });
         }
+        this.spreadsheet.recalculateAllFormulas();
     }
 
     sort(colIndex) {
@@ -737,7 +887,7 @@ class DownloadPrintManager {
         for (let j = 1; j < cols.length; j++) {
             let cellValue = "";
             if (cols[j].tagName === "TD") {
-                cellValue = cols[j].querySelector("input").value;
+                cellValue = cols[j].querySelector("input").dataset.formula || cols[j].querySelector("input").value;
             } else if (cols[j].tagName === "TH") {
                 cellValue = cols[j].innerText.trim();
                 cellValue = cellValue.replace(/\s*$/, '');
@@ -811,7 +961,7 @@ class DownloadPrintManager {
             if (value.startsWith('"') && value.endsWith('"')) {
                 value = value.substring(1, value.length - 1).replace(/""/g, '"');
             }
-            return { value: value, width: "", height: "" };
+            return { value: value, width: "", height: "", formula: value.startsWith('=') ? value : '' };
         });
         data.push(parsedRow);
     });
@@ -824,6 +974,8 @@ class Spreadsheet {
     this.numRows = numRows;
     this.numCols = numCols;
     this.table = document.getElementById(tableId);
+    this.isFormulaEditMode = false;
+    this.activeFormulaCell = null;
 
     this.tableManager = new TableManager(this);
     this.stateManager = new StateManager(this);
@@ -831,9 +983,10 @@ class Spreadsheet {
     this.contextMenuManager = new ContextMenuManager(this);
     this.sheetManager = new SheetManager(this);
     this.downloadPrintManager = new DownloadPrintManager(this);
+    this.formulaManager = new FormulaManager(this);
 
-    this.loadState();
     this.addGlobalListeners();
+    this.addCellListeners();
 
     const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
     if (!storedState || Object.keys(storedState.sheets).length === 0) {
@@ -841,6 +994,9 @@ class Spreadsheet {
     } else {
       this.sheetManager.loadSheets(storedState.sheets, storedState.activeSheet);
     }
+    
+    // Recalculate all formulas on load
+    this.recalculateAllFormulas();
   }
 
   addGlobalListeners() {
@@ -850,6 +1006,94 @@ class Spreadsheet {
     document.getElementById("uploadBtn").addEventListener("click", () => this.downloadPrintManager.uploadCSV());
     document.getElementById("darkModeToggle").addEventListener("change", (e) => this.toggleDarkMode(e.target.checked));
     document.addEventListener("keydown", (e) => this.stateManager.handleKeyboardShortcuts(e));
+
+    // Listen for mousedown on the entire document to finalize formula when clicking outside the table
+    document.addEventListener("mousedown", (e) => {
+      const isClickInsideTable = this.table.contains(e.target);
+      if (this.isFormulaEditMode && !isClickInsideTable) {
+        this.finalizeFormula();
+      }
+    });
+
+    // New mousedown listener to handle formula insertion. This fires before the blur/focusin events.
+    this.table.addEventListener("mousedown", (event) => {
+        const cell = event.target.closest('td');
+        if (this.isFormulaEditMode && cell && cell !== this.activeFormulaCell) {
+            console.log("Mousedown on cell while in formula mode. Inserting reference...");
+            const row = cell.parentElement.rowIndex - 1;
+            const col = cell.cellIndex - 1;
+            const cellId = this.getColumnName(col + 1) + (row + 1);
+            console.log("Cell ID to be inserted:", cellId);
+
+            const activeInput = this.activeFormulaCell.querySelector('input');
+            const start = activeInput.selectionStart;
+            const end = activeInput.selectionEnd;
+            activeInput.value = activeInput.value.substring(0, start) + cellId + activeInput.value.substring(end);
+            activeInput.focus();
+            activeInput.setSelectionRange(start + cellId.length, start + cellId.length);
+        }
+    });
+  }
+
+  addCellListeners() {
+    this.table.addEventListener("input", (event) => {
+        const input = event.target;
+        if (input.tagName === 'INPUT' && input.value.startsWith('=')) {
+            this.isFormulaEditMode = true;
+            this.activeFormulaCell = input.closest('td');
+        } else {
+            this.isFormulaEditMode = false;
+            this.activeFormulaCell = null;
+        }
+    });
+
+    this.table.addEventListener("focusin", (event) => {
+        const input = event.target;
+        if (input.tagName === 'INPUT') {
+            if (input.dataset.formula) {
+                input.value = input.dataset.formula;
+            }
+            if (input.value.startsWith('=')) {
+                this.isFormulaEditMode = true;
+                this.activeFormulaCell = input.closest('td');
+                console.log("Formula edit mode ON based on focusin event. Active cell:", this.activeFormulaCell);
+            } else {
+                 this.isFormulaEditMode = false;
+                 this.activeFormulaCell = null;
+            }
+        }
+    });
+
+    this.table.addEventListener("keydown", (event) => {
+        const input = event.target;
+        if (input.tagName === 'INPUT' && event.key === 'Enter') {
+            this.finalizeFormula();
+            input.blur();
+        } else if (this.isFormulaEditMode && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+            event.stopPropagation();
+        }
+    }, true);
+  }
+  
+  finalizeFormula() {
+    if (this.isFormulaEditMode && this.activeFormulaCell) {
+        console.log("Finalizing formula...");
+        const input = this.activeFormulaCell.querySelector('input');
+        input.dataset.formula = input.value;
+        this.recalculateAllFormulas();
+        this.isFormulaEditMode = false;
+        this.activeFormulaCell = null;
+    }
+  }
+
+  recalculateAllFormulas() {
+      const allInputs = this.table.querySelectorAll('input');
+      allInputs.forEach(input => {
+          if (input.dataset.formula) {
+              const result = this.formulaManager.evaluateFormula(input.dataset.formula);
+              input.value = result;
+          }
+      });
   }
 
   saveToLocalStorage() {
@@ -890,6 +1134,14 @@ class Spreadsheet {
       index = (index - temp - 1) / 26;
     }
     return letter;
+  }
+
+  columnNameToIndex(columnName) {
+    let index = 0;
+    for (let i = 0; i < columnName.length; i++) {
+        index = index * 26 + (columnName.charCodeAt(i) - 64);
+    }
+    return index - 1;
   }
 
   getColumnWidths() {
