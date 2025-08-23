@@ -1031,6 +1031,7 @@ class Spreadsheet {
             activeInput.value = activeInput.value.substring(0, start) + cellId + activeInput.value.substring(end);
             activeInput.focus();
             activeInput.setSelectionRange(start + cellId.length, start + cellId.length);
+            this.highlightFormulaReferences();
         }
     });
   }
@@ -1038,12 +1039,16 @@ class Spreadsheet {
   addCellListeners() {
     this.table.addEventListener("input", (event) => {
         const input = event.target;
-        if (input.tagName === 'INPUT' && input.value.startsWith('=')) {
-            this.isFormulaEditMode = true;
-            this.activeFormulaCell = input.closest('td');
-        } else {
-            this.isFormulaEditMode = false;
-            this.activeFormulaCell = null;
+        if (input.tagName === 'INPUT') {
+            if (input.value.startsWith('=')) {
+                this.isFormulaEditMode = true;
+                this.activeFormulaCell = input.closest('td');
+                this.highlightFormulaReferences();
+            } else {
+                this.isFormulaEditMode = false;
+                this.activeFormulaCell = null;
+                this.clearFormulaHighlights();
+            }
         }
     });
 
@@ -1056,7 +1061,7 @@ class Spreadsheet {
             if (input.value.startsWith('=')) {
                 this.isFormulaEditMode = true;
                 this.activeFormulaCell = input.closest('td');
-                console.log("Formula edit mode ON based on focusin event. Active cell:", this.activeFormulaCell);
+                this.highlightFormulaReferences();
             } else {
                  this.isFormulaEditMode = false;
                  this.activeFormulaCell = null;
@@ -1083,6 +1088,7 @@ class Spreadsheet {
         this.recalculateAllFormulas();
         this.isFormulaEditMode = false;
         this.activeFormulaCell = null;
+        this.clearFormulaHighlights();
     }
   }
 
@@ -1093,6 +1099,33 @@ class Spreadsheet {
               const result = this.formulaManager.evaluateFormula(input.dataset.formula);
               input.value = result;
           }
+      });
+  }
+
+  highlightFormulaReferences() {
+      this.clearFormulaHighlights();
+      if (!this.activeFormulaCell || !this.isFormulaEditMode) return;
+
+      const formula = this.activeFormulaCell.querySelector('input').value;
+      const cellReferences = [...new Set(formula.match(/[A-Z]+[0-9]+/g))];
+
+      if (cellReferences) {
+          cellReferences.forEach((ref, index) => {
+              const colName = ref.match(/[A-Z]+/)[0];
+              const rowNum = parseInt(ref.match(/[0-9]+/)[0], 10);
+              const colIndex = this.columnNameToIndex(colName);
+              const cell = this.table.querySelector(`tr:nth-child(${rowNum + 1}) td:nth-child(${colIndex + 2})`);
+              if (cell) {
+                  cell.classList.add('highlight-formula-ref', `color-${index % 7}`);
+              }
+          });
+      }
+  }
+
+  clearFormulaHighlights() {
+      document.querySelectorAll('.highlight-formula-ref').forEach(el => {
+          el.classList.remove('highlight-formula-ref');
+          el.classList.remove(...Array.from({length: 7}, (_, i) => `color-${i}`));
       });
   }
 
