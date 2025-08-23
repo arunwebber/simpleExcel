@@ -730,17 +730,19 @@ class DownloadPrintManager {
     let csv = [];
     const rows = this.spreadsheet.table.querySelectorAll("tr");
     
-    for (let i = 0; i < rows.length; i++) {
+    // Start the loop from the second row (index 1) to skip the column headers row
+    for (let i = 1; i < rows.length; i++) {
         let row = [], cols = rows[i].querySelectorAll("td, th");
-        for (let j = 0; j < cols.length; j++) {
+        // Start the loop from the second cell (index 1) to skip the row header
+        for (let j = 1; j < cols.length; j++) {
             let cellValue = "";
             if (cols[j].tagName === "TD") {
                 cellValue = cols[j].querySelector("input").value;
             } else if (cols[j].tagName === "TH") {
                 cellValue = cols[j].innerText.trim();
-                cellValue = cellValue.replace(/\s*$/, ''); // Remove trailing space from the sort indicator
+                cellValue = cellValue.replace(/\s*$/, '');
             }
-            row.push(`"${cellValue.replace(/"/g, '""')}"`); // Handle commas and quotes
+            row.push(`"${cellValue.replace(/"/g, '""')}"`);
         }
         csv.push(row.join(","));
     }
@@ -772,6 +774,49 @@ class DownloadPrintManager {
     printWindow.focus();
     printWindow.print();
   }
+
+  uploadCSV() {
+    const fileInput = document.getElementById("fileInput");
+    fileInput.click();
+
+    fileInput.addEventListener("change", (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const fileContent = e.target.result;
+            const data = this.parseCSV(fileContent);
+            
+            // Remove the first row (column headers)
+            const dataWithoutColHeaders = data.slice(1);
+            
+            // Remove the first column (row headers) from each row
+            const finalData = dataWithoutColHeaders.map(row => row.slice(1));
+            
+            this.spreadsheet.tableManager.loadData(finalData);
+            this.spreadsheet.saveToLocalStorage();
+        };
+        reader.readAsText(file);
+    });
+  }
+
+  parseCSV(text) {
+    const rows = text.split(/\r?\n/).filter(line => line.trim() !== "");
+    const data = [];
+    rows.forEach(row => {
+        const cells = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const parsedRow = cells.map(cell => {
+            let value = cell.trim();
+            if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.substring(1, value.length - 1).replace(/""/g, '"');
+            }
+            return { value: value, width: "", height: "" };
+        });
+        data.push(parsedRow);
+    });
+    return data;
+  }
 }
 
 class Spreadsheet {
@@ -802,6 +847,7 @@ class Spreadsheet {
     document.getElementById("clearBtn").addEventListener("click", () => this.tableManager.clearTable());
     document.getElementById("downloadBtn").addEventListener("click", () => this.downloadPrintManager.downloadAsCSV());
     document.getElementById("printBtn").addEventListener("click", () => this.downloadPrintManager.printTable());
+    document.getElementById("uploadBtn").addEventListener("click", () => this.downloadPrintManager.uploadCSV());
     document.getElementById("darkModeToggle").addEventListener("change", (e) => this.toggleDarkMode(e.target.checked));
     document.addEventListener("keydown", (e) => this.stateManager.handleKeyboardShortcuts(e));
   }

@@ -76,7 +76,8 @@ body.dark-mode #title {
 /* New styles for all the spreadsheet buttons that change based on dark mode */
 #clearBtn,
 #downloadBtn,
-#printBtn {
+#printBtn,
+#uploadBtn {
   cursor: pointer;
   touch-action: manipulation;
   min-width: 32px;
@@ -92,7 +93,8 @@ body.dark-mode #title {
 
 body.dark-mode #clearBtn,
 body.dark-mode #downloadBtn,
-body.dark-mode #printBtn {
+body.dark-mode #printBtn,
+body.dark-mode #uploadBtn {
   background-color: var(--element-bg-dark);
   border-color: var(--border-dark);
   color: var(--text-dark);
@@ -100,7 +102,8 @@ body.dark-mode #printBtn {
 
 body.dark-mode #clearBtn:hover,
 body.dark-mode #downloadBtn:hover,
-body.dark-mode #printBtn:hover {
+body.dark-mode #printBtn:hover,
+body.dark-mode #uploadBtn:hover {
   background-color: #3e3e40;
 }
 
@@ -374,7 +377,8 @@ body.dark-mode #footer {
 }
 
 #downloadBtn,
-#printBtn {
+#printBtn,
+#uploadBtn {
   background-color: var(--primary-color);
   color: white;
   border: none;
@@ -385,7 +389,8 @@ body.dark-mode #footer {
 }
 
 #downloadBtn:hover,
-#printBtn:hover {
+#printBtn:hover,
+#uploadBtn:hover {
   background-color: #0056b3;
 }
 
