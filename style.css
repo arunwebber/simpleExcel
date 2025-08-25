@@ -597,3 +597,51 @@ body.dark-mode .highlight-formula-ref.color-3 { background-color: rgba(255, 215,
 body.dark-mode .highlight-formula-ref.color-4 { background-color: rgba(138, 43, 226, 0.6); } /* Blue Violet */
 body.dark-mode .highlight-formula-ref.color-5 { background-color: rgba(0, 255, 255, 0.6); } /* Cyan */
 body.dark-mode .highlight-formula-ref.color-6 { background-color: rgba(255, 105, 180, 0.6); } /* Hot Pink */
+
+/* Autofill handle and highlight styles */
+.autofill-handle {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--primary-color);
+  border: 1px solid white;
+  cursor: crosshair;
+  z-index: 10;
+  display: none;
+}
+
+td:focus-within .autofill-handle, 
+td:hover .autofill-handle {
+  display: block;
+}
+
+.autofill-highlight {
+  background-color: rgba(0, 123, 255, 0.2);
+  border: 2px solid var(--primary-color);
+  box-shadow: inset 0 0 0 1px var(--primary-color);
+}
+
+body.dark-mode .autofill-handle {
+    background-color: var(--primary-color);
+    border: 1px solid var(--border-dark);
+}
+
+body.dark-mode .autofill-highlight {
+    background-color: rgba(0, 123, 255, 0.2);
+    border: 2px solid #66b3ff;
+    box-shadow: inset 0 0 0 1px #66b3ff;
+}
+
+body.dragging {
+    cursor: crosshair;
+}
+
+body.dragging .autofill-handle {
+    cursor: crosshair;
+}
+
+body.dragging input {
+    pointer-events: none;
+}

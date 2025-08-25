@@ -397,6 +397,11 @@ class TableManager {
         td.appendChild(this.createResizer("resizer", "width", td));
         td.appendChild(this.createResizer("resizer-row", "height", td));
         
+        // Add the autofill handle
+        const autofillHandle = document.createElement("div");
+        autofillHandle.className = "autofill-handle";
+        td.appendChild(autofillHandle);
+        
         return td;
     }
 
@@ -584,7 +589,8 @@ class TableManager {
         }
         return data;
     }
-
+    
+    // Original function for loading from saved state
     loadData(data) {
         if (!data || data.length === 0) return;
 
@@ -612,6 +618,28 @@ class TableManager {
                     input.dataset.formula = savedCell.formula || '';
                     if (savedCell.width) cell.style.width = savedCell.width;
                     if (savedCell.height) cell.style.height = savedCell.height;
+                }
+            });
+        }
+        this.spreadsheet.recalculateAllFormulas();
+    }
+    
+    // NEW function for loading data from CSV file
+    loadDataFromCSV(data) {
+        if (!data || data.length === 0) return;
+
+        // Populate cells, starting from the first data row (second HTML row)
+        const rows = this.table.querySelectorAll('tr');
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].querySelectorAll('td');
+            // The CSV data's index corresponds directly to the HTML table's data row index
+            const rowData = data[i-1] || []; 
+            cells.forEach((cell, colIndex) => {
+                const savedCell = rowData[colIndex];
+                if (savedCell) {
+                    const input = cell.querySelector('input');
+                    input.value = savedCell.value || '';
+                    input.dataset.formula = savedCell.formula || '';
                 }
             });
         }
@@ -693,8 +721,16 @@ class SheetManager {
   }
 
   addSheet(sheetName = null) {
-    this.sheetCount++;
-    const name = sheetName || `Sheet ${this.sheetCount}`;
+    let name = sheetName;
+    if (!name) {
+      const existingNumbers = Object.keys(this.sheets).map(s => {
+        const match = s.match(/^Sheet(\d+)$/);
+        return match ? parseInt(match[1]) : 0;
+      });
+      const maxNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) : 0;
+      name = `Sheet${maxNumber + 1}`;
+    }
+
     this.sheets[name] = {
       numRows: 25,
       numCols: 25,
@@ -936,16 +972,21 @@ class DownloadPrintManager {
         const reader = new FileReader();
         reader.onload = (e) => {
             const fileContent = e.target.result;
-            const data = this.parseCSV(fileContent);
-            
-            // Remove the first row (column headers)
-            const dataWithoutColHeaders = data.slice(1);
-            
-            // Remove the first column (row headers) from each row
-            const finalData = dataWithoutColHeaders.map(row => row.slice(1));
-            
-            this.spreadsheet.tableManager.loadData(finalData);
-            this.spreadsheet.saveToLocalStorage();
+            const parsedData = this.parseCSV(fileContent);
+
+            if (parsedData.length > 0) {
+                // Adjust table dimensions based on parsed data
+                this.spreadsheet.numRows = parsedData.length;
+                this.spreadsheet.numCols = parsedData[0].length;
+
+                // Re-create the table with new dimensions
+                this.spreadsheet.tableManager.createTable();
+
+                // Load the entire parsed data into the table cells
+                this.spreadsheet.tableManager.loadDataFromCSV(parsedData);
+                
+                this.spreadsheet.saveToLocalStorage();
+            }
         };
         reader.readAsText(file);
     });
@@ -955,15 +996,42 @@ class DownloadPrintManager {
     const rows = text.split(/\r?\n/).filter(line => line.trim() !== "");
     const data = [];
     rows.forEach(row => {
-        const cells = row.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-        const parsedRow = cells.map(cell => {
-            let value = cell.trim();
-            if (value.startsWith('"') && value.endsWith('"')) {
-                value = value.substring(1, value.length - 1).replace(/""/g, '"');
+        let cells = [];
+        let inQuote = false;
+        let currentCell = '';
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            const nextChar = row[i + 1];
+            const previousChar = row[i - 1];
+
+            if (char === '"') {
+                if (inQuote && nextChar === '"') {
+                    // Escaped quote
+                    currentCell += '"';
+                    i++;
+                } else {
+                    // Start or end of a quote
+                    inQuote = !inQuote;
+                }
+            } else if (char === ',' && !inQuote) {
+                cells.push({
+                    value: currentCell,
+                    width: "",
+                    height: "",
+                    formula: currentCell.startsWith('=') ? currentCell : ''
+                });
+                currentCell = '';
+            } else {
+                currentCell += char;
             }
-            return { value: value, width: "", height: "", formula: value.startsWith('=') ? value : '' };
+        }
+        cells.push({
+            value: currentCell,
+            width: "",
+            height: "",
+            formula: currentCell.startsWith('=') ? currentCell : ''
         });
-        data.push(parsedRow);
+        data.push(cells);
     });
     return data;
   }
@@ -976,6 +1044,8 @@ class Spreadsheet {
     this.table = document.getElementById(tableId);
     this.isFormulaEditMode = false;
     this.activeFormulaCell = null;
+    this.isDragging = false;
+    this.dragStartCell = null;
 
     this.tableManager = new TableManager(this);
     this.stateManager = new StateManager(this);
@@ -987,6 +1057,7 @@ class Spreadsheet {
 
     this.addGlobalListeners();
     this.addCellListeners();
+    this.addAutofillListeners();
 
     const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
     if (!storedState || Object.keys(storedState.sheets).length === 0) {
@@ -1080,6 +1151,188 @@ class Spreadsheet {
     }, true);
   }
   
+  addAutofillListeners() {
+    this.table.addEventListener("mousedown", (event) => {
+        const handle = event.target.closest(".autofill-handle");
+        if (handle) {
+            event.preventDefault();
+            this.isDragging = true;
+            this.dragStartCell = handle.closest("td");
+            document.body.classList.add("dragging");
+        }
+    });
+
+    this.table.addEventListener("mouseover", (event) => {
+        const cell = event.target.closest("td");
+        if (this.isDragging && cell) {
+            const startRow = this.dragStartCell.parentElement.rowIndex;
+            const startCol = this.dragStartCell.cellIndex;
+            const endRow = cell.parentElement.rowIndex;
+            const endCol = cell.cellIndex;
+
+            this.highlightAutofillRange(startRow, startCol, endRow, endCol);
+        }
+    });
+
+    document.addEventListener("mouseup", (event) => {
+        if (this.isDragging) {
+            this.isDragging = false;
+            document.body.classList.remove("dragging");
+            const startCell = this.dragStartCell;
+            const endCell = document.elementFromPoint(event.clientX, event.clientY).closest('td');
+
+            if (startCell && endCell) {
+                this.autofill(startCell, endCell);
+            }
+            this.dragStartCell = null;
+            this.clearAutofillHighlights();
+        }
+    });
+  }
+
+  highlightAutofillRange(startRow, startCol, endRow, endCol) {
+    this.clearAutofillHighlights();
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+
+    for (let r = minRow; r <= maxRow; r++) {
+      const rowEl = this.table.rows[r];
+      if (rowEl) {
+        for (let c = minCol; c <= maxCol; c++) {
+          const cellEl = rowEl.cells[c];
+          if (cellEl) {
+            cellEl.classList.add('autofill-highlight');
+          }
+        }
+      }
+    }
+  }
+
+  clearAutofillHighlights() {
+    this.table.querySelectorAll('.autofill-highlight').forEach(cell => {
+      cell.classList.remove('autofill-highlight');
+    });
+  }
+
+  autofill(startCell, endCell) {
+    const startRow = startCell.parentElement.rowIndex;
+    const startCol = startCell.cellIndex;
+    const endRow = endCell.parentElement.rowIndex;
+    const endCol = endCell.cellIndex;
+
+    const isHorizontal = startRow === endRow;
+
+    const sourceInput = startCell.querySelector('input');
+    const sourceFormula = sourceInput.dataset.formula;
+    const sourceValue = sourceInput.value;
+
+    const minRow = Math.min(startRow, endRow);
+    const maxRow = Math.max(startRow, endRow);
+    const minCol = Math.min(startCol, endCol);
+    const maxCol = Math.max(startCol, endCol);
+
+    let startVal, nextVal, step = 1;
+    let textPrefix = '';
+    let isNumberSeries = false;
+    let isAlphaSeries = false;
+
+    if (isHorizontal && minCol !== maxCol) {
+        const nextCell = this.table.rows[startRow].cells[startCol + 1];
+        startVal = sourceInput.value;
+        nextVal = nextCell?.querySelector('input')?.value;
+    } else if (!isHorizontal && minRow !== maxRow) {
+        const nextCell = this.table.rows[startRow + 1].cells[startCol];
+        startVal = sourceInput.value;
+        nextVal = nextCell?.querySelector('input')?.value;
+    } else {
+        startVal = sourceInput.value;
+        nextVal = null;
+    }
+    
+    // Check for number series
+    const startNumber = parseFloat(startVal);
+    const nextNumber = parseFloat(nextVal);
+    
+    if (!isNaN(startNumber)) {
+        if (!isNaN(nextNumber)) {
+            step = nextNumber - startNumber;
+        }
+        isNumberSeries = true;
+    } else {
+        const match = sourceValue.match(/^(.*?)(\d+)$/);
+        if (match) {
+            textPrefix = match[1];
+            startVal = parseInt(match[2], 10);
+            
+            const nextMatch = nextVal?.match(/^(.*?)(\d+)$/);
+            if (nextMatch && nextMatch[1] === textPrefix) {
+                nextVal = parseInt(nextMatch[2], 10);
+                step = nextVal - startVal;
+            } else {
+                step = 1;
+            }
+            isNumberSeries = true;
+        } else if (sourceValue.length === 1 && sourceValue.match(/[a-zA-Z]/)) {
+            isAlphaSeries = true;
+        }
+    }
+    
+    for (let r = minRow; r <= maxRow; r++) {
+        for (let c = minCol; c <= maxCol; c++) {
+            if (r === startRow && c === startCol) continue;
+
+            const targetCell = this.table.rows[r].cells[c];
+            if (!targetCell) continue;
+
+            const targetInput = targetCell.querySelector('input');
+            const rowDelta = r - startRow;
+            const colDelta = c - startCol;
+
+            // Handle formulas
+            if (sourceFormula) {
+                const newFormula = sourceFormula.replace(/[A-Z]+[0-9]+/g, (match) => {
+                    const colName = match.match(/[A-Z]+/)[0];
+                    const rowNum = parseInt(match.match(/[0-9]+/)[0], 10);
+
+                    const originalColIndex = this.columnNameToIndex(colName);
+                    const newColIndex = originalColIndex + colDelta;
+                    const newColName = this.getColumnName(newColIndex + 1);
+
+                    const newRowNum = rowNum + rowDelta;
+
+                    return newColName + newRowNum;
+                });
+                targetInput.dataset.formula = newFormula;
+                targetInput.value = this.formulaManager.evaluateFormula(newFormula);
+            } else if (isNumberSeries) {
+                const currentDelta = isHorizontal ? colDelta : rowDelta;
+                const newValue = (parseFloat(startNumber) || startVal) + (currentDelta * step);
+                if (textPrefix) {
+                    targetInput.value = textPrefix + newValue;
+                } else {
+                    targetInput.value = newValue;
+                }
+                targetInput.dataset.formula = '';
+            } else if (isAlphaSeries) {
+                const currentDelta = isHorizontal ? colDelta : rowDelta;
+                const charCode = sourceValue.charCodeAt(0);
+                const newCharCode = charCode + currentDelta;
+                const newValue = String.fromCharCode(newCharCode);
+                targetInput.value = newValue;
+                targetInput.dataset.formula = '';
+            } else {
+                // Handle non-formulas and non-numbers (text)
+                targetInput.value = sourceValue;
+                targetInput.dataset.formula = '';
+            }
+        }
+    }
+    this.recalculateAllFormulas();
+    this.stateManager.saveState();
+  }
+
   finalizeFormula() {
     if (this.isFormulaEditMode && this.activeFormulaCell) {
         console.log("Finalizing formula...");
