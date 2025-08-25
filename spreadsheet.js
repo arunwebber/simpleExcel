@@ -1065,12 +1065,17 @@ class Spreadsheet {
     this.addAutofillListeners();
 
     const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
+        // Load dark mode FIRST before any sheet operations
+    if (storedState && storedState.darkMode) {
+      document.body.classList.add('dark-mode');
+      document.getElementById("darkModeToggle").checked = true;
+    }
+
     if (!storedState || Object.keys(storedState.sheets).length === 0) {
       this.sheetManager.addSheet();
     } else {
       this.sheetManager.loadSheets(storedState.sheets, storedState.activeSheet);
     }
-    
     // Recalculate all formulas on load
     this.recalculateAllFormulas();
   }
