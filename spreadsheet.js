@@ -339,6 +339,10 @@ class TableManager {
             const inputElement = e.target;
             const cell = inputElement.closest('td');
             if (cell) {
+                // If user deletes everything, also clear the formula
+                if (inputElement.value.trim() === '') {
+                    inputElement.dataset.formula = '';
+                }
                 const rowIndex = cell.parentElement.rowIndex - 1;
                 const colIndex = cell.cellIndex - 1;
                 this.spreadsheet.formulaManager.cache.clear();
@@ -346,6 +350,7 @@ class TableManager {
             }
             this.spreadsheet.stateManager.saveState();
         });
+
         
         document.addEventListener("mouseup", (event) => {
             const isResizer = event.target.className.includes('resizer');
