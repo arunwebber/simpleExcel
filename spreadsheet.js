@@ -18,6 +18,197 @@ class StorageManager {
   }
 }
 
+class ApiKeyManager {
+  constructor() {
+    this.modal = document.getElementById('apiKeyModal');
+    this.apiKeyInput = document.getElementById('apiKeyInput');
+    this.saveBtn = document.getElementById('saveApiKeyBtn');
+    this.closeBtn = document.getElementById('closeModalBtn');
+    this.settingsBtn = document.getElementById('settingsButton');
+
+    this.bindEvents();
+  }
+
+  bindEvents() {
+    this.settingsBtn.addEventListener('click', () => {
+      this.showModal();
+    });
+    this.saveBtn.addEventListener('click', () => {
+      this.saveApiKey();
+    });
+    this.closeBtn.addEventListener('click', () => {
+      this.hideModal();
+    });
+    this.modal.addEventListener('click', (event) => {
+      if (event.target === this.modal) {
+        this.hideModal();
+      }
+    });
+  }
+
+  showModal() {
+    const existingKey = StorageManager.getFromLocalStorage('apiKey');
+    if (existingKey) {
+      this.apiKeyInput.value = existingKey;
+    } else {
+      this.apiKeyInput.value = '';
+    }
+    this.modal.style.display = 'flex';
+  }
+
+  hideModal() {
+    this.modal.style.display = 'none';
+  }
+
+  saveApiKey() {
+    const key = this.apiKeyInput.value.trim();
+    if (key) {
+      StorageManager.saveToLocalStorage('apiKey', key);
+      alert('API Key saved successfully!');
+      this.hideModal();
+    } else {
+      alert('Please enter a valid API key.');
+    }
+  }
+}
+
+class SpreadsheetAIIntegration {
+    constructor(spreadsheet) {
+        this.spreadsheet = spreadsheet;
+        this.aiPanel = document.getElementById('rightPanel');
+        this.aiNoteElement = document.querySelector('.ai-note');
+        this.aiWriteButton = document.getElementById('aiWriteButton');
+        this.apiKeyManager = new ApiKeyManager();
+        this.pollingTimeout = null;
+        this.apiCache = {};
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        this.aiWriteButton.addEventListener('click', () => this.handleAiWrite());
+    }
+
+    async handleAiWrite() {
+        const apiKey = StorageManager.getFromLocalStorage('apiKey');
+        if (!apiKey) {
+            this.apiKeyManager.showModal();
+            return;
+        }
+
+        const dataToSummarize = this.extractSheetData();
+        if (!dataToSummarize) {
+            this.aiNoteElement.textContent = 'No data to summarize.';
+            return;
+        }
+
+        const cacheKey = await this.generateCacheKey(dataToSummarize);
+
+        if (this.apiCache[cacheKey]) {
+            this.aiNoteElement.textContent = this.apiCache[cacheKey];
+            return;
+        }
+
+        this.aiNoteElement.textContent = 'Loading...';
+
+        try {
+            const requestBody = { content: dataToSummarize };
+            const response = await this.callSharpApi('POST', '/v1/content/summarize', apiKey, requestBody);
+
+            if (response.status_url) {
+                this.aiNoteElement.textContent = 'Job accepted. Waiting for result...';
+                this.pollForStatus(response.status_url, apiKey, cacheKey);
+            }
+
+        } catch (error) {
+            this.aiNoteElement.textContent = `Error: ${error.message}`;
+        }
+    }
+
+    extractSheetData() {
+        const data = this.spreadsheet.tableManager.getCurrentData();
+        if (!data || data.length === 0) return null;
+
+        let extractedText = '';
+        const headerCells = this.spreadsheet.table.querySelectorAll('tr:first-child th');
+        const headers = Array.from(headerCells).slice(1).map(th => th.querySelector('.header-text').textContent);
+
+        extractedText += headers.join('\t') + '\n';
+        data.forEach(row => {
+            const rowValues = row.map(cell => cell.value);
+            extractedText += rowValues.join('\t') + '\n';
+        });
+
+        return extractedText.trim();
+    }
+
+    async generateCacheKey(content) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(content);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return `summary-${hashHex.substring(0, 16)}`;
+    }
+
+    async pollForStatus(statusUrl, apiKey, cacheKey, retries = 0) {
+        const maxRetries = 10;
+        const pollInterval = 3000;
+
+        if (retries >= maxRetries) {
+            this.aiNoteElement.textContent = 'Job timed out. Please try again.';
+            return;
+        }
+
+        try {
+            const response = await this.callSharpApi('GET', statusUrl, apiKey);
+
+            if (response.data.attributes.status === 'completed' || response.data.attributes.status === 'success') {
+                const result = JSON.parse(response.data.attributes.result);
+                const finalResult = result.summary || 'No summary found.';
+                this.aiNoteElement.textContent = finalResult;
+                this.apiCache[cacheKey] = finalResult;
+                return;
+            } else if (response.data.attributes.status === 'failed') {
+                this.aiNoteElement.textContent = `Job failed: ${response.data.attributes.message || 'Unknown error'}`;
+                return;
+            }
+
+            this.pollingTimeout = setTimeout(() => this.pollForStatus(statusUrl, apiKey, cacheKey, retries + 1), pollInterval);
+
+        } catch (error) {
+            this.aiNoteElement.textContent = `Polling failed: ${error.message}`;
+        }
+    }
+
+    async callSharpApi(method, path, apiKey, body = null) {
+        const url = path.startsWith('http') ? path : `https://sharpapi.com/api${path}`;
+
+        const headers = new Headers();
+        headers.append("Accept", "application/json");
+        headers.append("Authorization", `Bearer ${apiKey}`);
+
+        if (method === 'POST') {
+            headers.append("Content-Type", "application/json");
+        }
+
+        const requestOptions = {
+            method,
+            headers,
+            body: body ? JSON.stringify(body) : null,
+            redirect: "follow"
+        };
+
+        const response = await fetch(url, requestOptions);
+        const result = await response.json();
+
+        if (!response.ok && response.status !== 202) {
+            throw new Error(result.message || `API call failed with status ${response.status}`);
+        }
+
+        return result;
+    }
+}
+
 class StateManager {
   constructor(spreadsheet) {
     this.spreadsheet = spreadsheet;
@@ -1059,13 +1250,14 @@ class Spreadsheet {
     this.sheetManager = new SheetManager(this);
     this.downloadPrintManager = new DownloadPrintManager(this);
     this.formulaManager = new FormulaManager(this);
+    this.apiKeyManager = new ApiKeyManager(); // Add this line
+    this.aiIntegration = new SpreadsheetAIIntegration(this); // Add this line
 
     this.addGlobalListeners();
     this.addCellListeners();
     this.addAutofillListeners();
 
     const storedState = StorageManager.getFromLocalStorage('spreadsheetState');
-        // Load dark mode FIRST before any sheet operations
     if (storedState && storedState.darkMode) {
       document.body.classList.add('dark-mode');
       document.getElementById("darkModeToggle").checked = true;
@@ -1076,7 +1268,6 @@ class Spreadsheet {
     } else {
       this.sheetManager.loadSheets(storedState.sheets, storedState.activeSheet);
     }
-    // Recalculate all formulas on load
     this.recalculateAllFormulas();
   }
 
