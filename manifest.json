@@ -1,11 +1,11 @@
 {
     "manifest_version": 3,
     "name": "Simple Spreadsheet Extension",
-    "version": "3.0.0",
+    "version": "4.0.0",
     "description": "Opens a new tab with a simple spreadsheet interface.",
 
     "action": {
-      "default_title": "Open Spreadsheet",
+      "default_title": "Simple Spreadsheet Extension",
       "default_icon": {
         "16": "images/icon_16.png",
         "48": "images/icon_48.png",
